@@ -1,0 +1,12 @@
+image: freebsd/latest
+sources:
+  - https://git.sr.ht/~rodrgz/cmdtop
+packages:
+  - rust
+tasks:
+  - build: |
+      cd cmdtop
+      cargo build --release
+  - test: |
+      cd cmdtop
+      cargo test

@@ -1,0 +1,12 @@
+image: alpine/edge
+sources:
+  - https://git.sr.ht/~rodrgz/cmdtop
+packages:
+  - cargo
+tasks:
+  - build: |
+      cd cmdtop
+      cargo build --release
+  - test: |
+      cd cmdtop
+      cargo test

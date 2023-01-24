@@ -1,0 +1,7 @@
+**/*.rs.bk
+.direnv
+Cargo.lock
+debug/
+result*
+target/
+todo
