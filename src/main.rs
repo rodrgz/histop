@@ -60,14 +60,14 @@ fn main() {
             }
             "-h" | "--help" => {
                 println!("Usage: cmdtop [OPTIONS]");
-                println!("-f <FILE>           History path [default: /home/erik/.config/zsh/.zsh_history]");
+                println!("-f <FILE>           Path to history file");
                 println!("-c <COUNT>          Number of commands to print [default: 25]");
                 println!("-a                  Print all commands");
                 println!("-m <MORE_THAN>      Only consider commands used more than <MORE_THAN> times [default: 1]");
-                println!("-i <IGNORE>         Ignore commands: \"ls|grep|nvim\"");
-                println!("-n                  Do not print the bar");
-                println!("-b <BAR_SIZE>       Bar size [default: 25]");
-                println!("-h, --help          Print help");
+                println!("-i <IGNORE>         Ignore specified commands, e.g. \"ls|grep|nvim\"");
+                println!("-n                  Do not print bar graph");
+                println!("-b <BAR_SIZE>       Size of bar graph [default: 25]");
+                println!("-h, --help          Print this help message");
                 return;
             }
             _ => {
