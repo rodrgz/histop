@@ -1,9 +1,9 @@
-# cmdtop
+# histop
 
 
 <dl>
-  <dt>Linux (x86_64)</dt><dd><a href="https://builds.sr.ht/~rodrgz/cmdtop/commits/main/alpine.yml"><img src="https://builds.sr.ht/~rodrgz/cmdtop/commits/main/alpine.yml.svg" alt="Build status for Linux" /></a></dd>
-  <dt>FreeBSD (x86_64)</dt><dd><a href="https://builds.sr.ht/~rodrgz/cmdtop/commits/main/freebsd.yml"><img src="https://builds.sr.ht/~rodrgz/cmdtop/commits/main/freebsd.yml.svg" alt="Build status for FreeBSD" /></a></dd>
+  <dt>Linux (x86_64)</dt><dd><a href="https://builds.sr.ht/~rodrgz/histop/commits/main/alpine.yml"><img src="https://builds.sr.ht/~rodrgz/histop/commits/main/alpine.yml.svg" alt="Build status for Linux" /></a></dd>
+  <dt>FreeBSD (x86_64)</dt><dd><a href="https://builds.sr.ht/~rodrgz/histop/commits/main/freebsd.yml"><img src="https://builds.sr.ht/~rodrgz/histop/commits/main/freebsd.yml.svg" alt="Build status for FreeBSD" /></a></dd>
 </dl>
 
 This program analyzes a zsh/bash history file and tallies the frequency of each command, taking into account piped commands, while disregarding occurrences of environment variables, as well as the use of the "doas" and "sudo" commands.
@@ -11,14 +11,14 @@ This program analyzes a zsh/bash history file and tallies the frequency of each 
 ## Usage
 
 ```
-git clone https://git.sr.ht/~rodrgz/cmdtop
-cd cmdtop
+git clone https://git.sr.ht/~rodrgz/histop
+cd histop
 cargo build #or nix build
 ```
 
 ```
-$ cmdtop -h 
-Usage: cmdtop [OPTIONS]
+$ histop -h 
+Usage: histop [OPTIONS]
 -f <FILE>           Path to history file
 -c <COUNT>          Number of commands to print [default: 25]
 -a                  Print all commands
@@ -32,7 +32,7 @@ Usage: cmdtop [OPTIONS]
 ## Example
 
 ```
-$ cmdtop -f ~/.zsh_history -c 10
+$ histop -f ~/.zsh_history -c 10
 1441   │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓███│ 13.79%    exa
 995    │░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██│ 9.52%     z
 910    │░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██│ 8.71%     hx
@@ -42,7 +42,7 @@ $ cmdtop -f ~/.zsh_history -c 10
 219    │░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓█│ 2.10%     dust
 201    │░░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓│ 1.92%     :q
 190    │░░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓│ 1.82%     git
-188    │░░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓│ 1.80%     cmdtop
+188    │░░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓│ 1.80%     histop
 ```
 
 ## Requirements

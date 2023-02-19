@@ -1,12 +1,12 @@
 image: alpine/edge
 sources:
-  - https://git.sr.ht/~rodrgz/cmdtop
+  - https://git.sr.ht/~rodrgz/histop
 packages:
   - cargo
 tasks:
   - build: |
-      cd cmdtop
+      cd histop
       cargo build --release
   - test: |
-      cd cmdtop
+      cd histop
       cargo test

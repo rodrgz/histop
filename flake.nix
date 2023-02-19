@@ -1,5 +1,5 @@
 {
-  description = "cmdtop";
+  description = "histop";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
