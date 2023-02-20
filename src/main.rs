@@ -69,7 +69,7 @@ fn main() {
         });
     }
 
-    commands.retain(|cmd| cmd.count >= more_than);
+    commands.retain(|cmd| cmd.count > more_than);
     commands.sort_by_key(|cmd| std::cmp::Reverse(cmd.count));
 
     let n = if all {
@@ -167,7 +167,7 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), Str
     let mut file = &get_histfile();
     let mut count = 25;
     let mut all = false;
-    let mut more_than = 1;
+    let mut more_than = 0;
     let mut ignore = String::new();
     let mut no_bar = false;
     let mut bar_size = 25;
@@ -212,7 +212,7 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), Str
                 }
             }
             "-h" | "--help" => {
-                print_help_message();
+                print_help_message(count, bar_size);
                 std::process::exit(0);
             }
             _ => {
@@ -250,16 +250,22 @@ fn get_histfile() -> String {
     })
 }
 
-fn print_help_message() {
-    println!("Usage: cmdtop [OPTIONS]");
+fn print_help_message(count: usize, bar_size: usize) {
+    println!("Usage: histop [OPTIONS]");
     println!("-f <FILE>           Path to history file");
-    println!("-c <COUNT>          Number of commands to print [default: 25]");
-    println!("-a                  Print all commands");
     println!(
-        "-m <MORE_THAN>      Only consider commands used more than <MORE_THAN> times [default: 1]"
+        "-c <COUNT>          Number of commands to print [default: {}]",
+        count
     );
+    println!("-a                  Print all commands");
+    println!("-m <MORE_THAN>      Only consider commands used more than <MORE_THAN> times");
     println!("-i <IGNORE>         Ignore specified commands, e.g. \"ls|grep|nvim\"");
     println!("-n                  Do not print bar graph");
-    println!("-b <BAR_SIZE>       Size of bar graph [default: 25]");
+    println!(
+        "-b <BAR_SIZE>       Size of bar graph [default: {}]",
+        bar_size
+    );
     println!("-h, --help          Print this help message");
+    println!("▓▓                  Logarithmically Scaled Percentage");
+    println!("██                  Percentage");
 }
