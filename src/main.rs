@@ -213,6 +213,7 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), Str
             }
             "-h" | "--help" => {
                 print_help_message();
+                std::process::exit(0);
             }
             _ => {
                 return Err(format!("Invalid option: {}", args[i]));
