@@ -1,12 +1,11 @@
 # histop
 
-
 <dl>
   <dt>Linux (x86_64)</dt><dd><a href="https://builds.sr.ht/~rodrgz/histop/commits/main/alpine.yml"><img src="https://builds.sr.ht/~rodrgz/histop/commits/main/alpine.yml.svg" alt="Build status for Linux" /></a></dd>
   <dt>FreeBSD (x86_64)</dt><dd><a href="https://builds.sr.ht/~rodrgz/histop/commits/main/freebsd.yml"><img src="https://builds.sr.ht/~rodrgz/histop/commits/main/freebsd.yml.svg" alt="Build status for FreeBSD" /></a></dd>
 </dl>
 
-This program analyzes a zsh/bash history file and tallies the frequency of each command, taking into account piped commands, while disregarding occurrences of environment variables, as well as the use of the "doas" and "sudo" commands.
+Uncover the hidden gems of your command history! This nifty program analyzes your zsh/bash history file and presents the most frequently used commands in a visually appealing and easy-to-understand format. With powerful options to filter out noise and focus on what matters.
 
 ## Usage
 

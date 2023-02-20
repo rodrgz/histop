@@ -1,83 +1,20 @@
-use std::cmp::min;
-use std::collections::HashMap;
-use std::fs;
+use std::{cmp::min, collections::HashMap, env, fs};
 
-// Struct to hold command name and count
-struct Command<'a> {
-    name: &'a str,
+struct Command {
+    name: String,
     count: usize,
 }
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-
-    let mut file = &get_histfile();
-    let mut count = 25;
-    let mut all = false;
-    let mut more_than = 1;
-    let mut ignore = String::new();
-    let mut no_bar = false;
-    let mut bar_size = 25;
-
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "-f" => {
-                i += 1;
-                if i < args.len() {
-                    file = &args[i];
-                }
-            }
-            "-c" => {
-                i += 1;
-                if i < args.len() {
-                    count = args[i].parse().unwrap_or(25);
-                }
-            }
-            "-a" => {
-                all = true;
-            }
-            "-m" => {
-                i += 1;
-                if i < args.len() {
-                    more_than = args[i].parse().unwrap_or(1);
-                }
-            }
-            "-i" => {
-                i += 1;
-                if i < args.len() {
-                    ignore = args[i].clone();
-                }
-            }
-            "-n" => {
-                no_bar = true;
-            }
-            "-b" => {
-                i += 1;
-                if i < args.len() {
-                    bar_size = args[i].parse().unwrap_or(25);
-                }
-            }
-            "-h" | "--help" => {
-                println!("Usage: cmdtop [OPTIONS]");
-                println!("-f <FILE>           Path to history file");
-                println!("-c <COUNT>          Number of commands to print [default: 25]");
-                println!("-a                  Print all commands");
-                println!("-m <MORE_THAN>      Only consider commands used more than <MORE_THAN> times [default: 1]");
-                println!("-i <IGNORE>         Ignore specified commands, e.g. \"ls|grep|nvim\"");
-                println!("-n                  Do not print bar graph");
-                println!("-b <BAR_SIZE>       Size of bar graph [default: 25]");
-                println!("-h, --help          Print this help message");
-                return;
-            }
-            _ => {
-                println!("Invalid option: {}", args[i]);
-                return;
-            }
+    let args = match parse_args() {
+        Ok(args) => args,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
         }
-        i += 1;
-    }
+    };
 
+    let (hist_file, count, all, more_than, ignore, no_bar, bar_size) = args;
     let mut filtered_commands = vec!["sudo", "doas"];
     filtered_commands.extend(ignore.split('|').map(|s| s.trim()).collect::<Vec<_>>());
 
@@ -85,14 +22,15 @@ fn main() {
     let mut cmd_count: HashMap<String, usize> = HashMap::new();
 
     // Read history file
-    let history = match fs::read_to_string(file) {
-        Ok(file) => file,
+    let history = match fs::read_to_string(&hist_file) {
+        Ok(hist_file) => hist_file,
         // Handle file read error
         Err(e) => {
             eprintln!("Error reading history file: {}", e);
             return;
         }
     };
+
     if history.is_empty() {
         println!("History file is empty");
         return;
@@ -126,13 +64,13 @@ fn main() {
     let mut commands = Vec::with_capacity(cmd_count.len());
     for (name, count) in &cmd_count {
         commands.push(Command {
-            name,
+            name: name.to_string(),
             count: *count,
         });
     }
 
     commands.retain(|cmd| cmd.count >= more_than);
-    commands.sort_by(|a, b| b.count.cmp(&a.count));
+    commands.sort_by_key(|cmd| std::cmp::Reverse(cmd.count));
 
     let n = if all {
         commands.len()
@@ -140,7 +78,7 @@ fn main() {
         min(count, commands.len())
     };
 
-    let total_count = commands.iter().fold(0, |acc, cmd| acc + cmd.count);
+    let total_count: usize = commands.iter().map(|cmd| cmd.count).sum();
     let mut total_percentage = 0.0;
 
     for (cmd, _) in commands.iter().zip(0..n) {
@@ -154,23 +92,6 @@ fn main() {
         }
         println!(" {:<9} {:<}", format!("{:.2}%", percentage), cmd.name);
     }
-}
-
-fn get_histfile() -> String {
-    std::env::var("HISTFILE").unwrap_or_else(|_| {
-        let user = std::env::var("USER").unwrap_or_default();
-        let shell = std::env::var("SHELL").unwrap_or_default();
-        if shell.ends_with("zsh") {
-            match std::fs::metadata(format!("/home/{}/.config/zsh/.zsh_history", user)) {
-                Ok(_) => format!("/home/{}/.config/zsh/.zsh_history", user),
-                Err(_) => format!("/home/{}/.zsh_history", user),
-            }
-        } else if shell.ends_with("bash") {
-            format!("/home/{}/.bash_history", user)
-        } else {
-            String::new()
-        }
-    })
 }
 
 fn count_commands(cmd_count: &mut HashMap<String, usize>, line: &str, filtered_commands: &[&str]) {
@@ -238,4 +159,106 @@ fn print_bar(normalized_percentage: f32, percentage: f32, bar_size: usize) {
         "▓".repeat(semifilled_count),
         "█".repeat(filled_count)
     );
+}
+
+fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), String> {
+    let args: Vec<String> = env::args().collect();
+
+    let mut file = &get_histfile();
+    let mut count = 25;
+    let mut all = false;
+    let mut more_than = 1;
+    let mut ignore = String::new();
+    let mut no_bar = false;
+    let mut bar_size = 25;
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-f" => {
+                i += 1;
+                if i < args.len() {
+                    file = &args[i];
+                }
+            }
+            "-c" => {
+                i += 1;
+                if i < args.len() {
+                    count = args[i].parse().unwrap_or(25);
+                }
+            }
+            "-a" => {
+                all = true;
+            }
+            "-m" => {
+                i += 1;
+                if i < args.len() {
+                    more_than = args[i].parse().unwrap_or(1);
+                }
+            }
+            "-i" => {
+                i += 1;
+                if i < args.len() {
+                    ignore = args[i].clone();
+                }
+            }
+            "-n" => {
+                no_bar = true;
+            }
+            "-b" => {
+                i += 1;
+                if i < args.len() {
+                    bar_size = args[i].parse().unwrap_or(25);
+                }
+            }
+            "-h" | "--help" => {
+                print_help_message();
+            }
+            _ => {
+                return Err(format!("Invalid option: {}", args[i]));
+            }
+        }
+        i += 1;
+    }
+
+    Ok((
+        file.to_string(),
+        count,
+        all,
+        more_than,
+        ignore,
+        no_bar,
+        bar_size,
+    ))
+}
+
+fn get_histfile() -> String {
+    std::env::var("HISTFILE").unwrap_or_else(|_| {
+        let user = std::env::var("USER").unwrap_or_default();
+        let shell = std::env::var("SHELL").unwrap_or_default();
+        if shell.ends_with("zsh") {
+            match std::fs::metadata(format!("/home/{}/.config/zsh/.zsh_history", user)) {
+                Ok(_) => format!("/home/{}/.config/zsh/.zsh_history", user),
+                Err(_) => format!("/home/{}/.zsh_history", user),
+            }
+        } else if shell.ends_with("bash") {
+            format!("/home/{}/.bash_history", user)
+        } else {
+            String::new()
+        }
+    })
+}
+
+fn print_help_message() {
+    println!("Usage: cmdtop [OPTIONS]");
+    println!("-f <FILE>           Path to history file");
+    println!("-c <COUNT>          Number of commands to print [default: 25]");
+    println!("-a                  Print all commands");
+    println!(
+        "-m <MORE_THAN>      Only consider commands used more than <MORE_THAN> times [default: 1]"
+    );
+    println!("-i <IGNORE>         Ignore specified commands, e.g. \"ls|grep|nvim\"");
+    println!("-n                  Do not print bar graph");
+    println!("-b <BAR_SIZE>       Size of bar graph [default: 25]");
+    println!("-h, --help          Print this help message");
 }
