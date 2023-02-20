@@ -18,9 +18,6 @@ fn main() {
     let mut filtered_commands = vec!["sudo", "doas"];
     filtered_commands.extend(ignore.split('|').map(|s| s.trim()).collect::<Vec<_>>());
 
-    // Initialize a hashmap to hold command count
-    let mut cmd_count: HashMap<String, usize> = HashMap::new();
-
     // Read history file
     let history = match fs::read_to_string(&hist_file) {
         Ok(hist_file) => hist_file,
@@ -35,6 +32,9 @@ fn main() {
         println!("History file is empty");
         return;
     }
+
+    // Initialize a hashmap to hold command count
+    let mut cmd_count: HashMap<String, usize> = HashMap::new();
 
     // Initialize variables to hold command and skip flag
     let mut skip = false;
@@ -104,7 +104,7 @@ fn count_commands(cmd_count: &mut HashMap<String, usize>, line: &str, filtered_c
 }
 
 fn clean_line(line: &str) -> String {
-    let mut cleaned_line = String::new();
+    let mut cleaned_line = String::with_capacity(line.len());
     let mut in_quotes = false;
     for c in line.chars() {
         if c == '\'' || c == '\"' {
