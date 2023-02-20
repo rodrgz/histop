@@ -84,11 +84,10 @@ fn main() {
     for (cmd, _) in commands.iter().zip(0..n) {
         let percentage = cmd.count as f32 / total_count as f32 * 100.0;
         total_percentage += percentage;
-        let normalized_percentages = percentage * 100.0 / total_percentage;
 
         print!("{: <7}", cmd.count);
         if !no_bar {
-            print_bar(normalized_percentages, percentage, bar_size);
+            print_bar(percentage, total_percentage, bar_size);
         }
         println!(" {:<9} {:<}", format!("{:.2}%", percentage), cmd.name);
     }
@@ -145,12 +144,13 @@ fn get_first_word<'a>(subcommand: &'a str, filtered_commands: &[&str]) -> &'a st
     ""
 }
 
-fn print_bar(normalized_percentage: f32, percentage: f32, bar_size: usize) {
-    let log_normalized_percentage = (normalized_percentage + 1.0).ln() / 101.0_f32.ln();
+fn print_bar(percentage: f32, total_percentage: f32, bar_size: usize) {
+    let scaled_percentage = percentage * 100.0 / total_percentage;
+    let scaled_log_decimal = (scaled_percentage + 1.0).ln() / 100_f32.ln();
+    let decimal = percentage / 100.0;
 
-    let filled_count = (percentage / 100.0 * bar_size as f32).round() as usize;
-    let semifilled_count =
-        ((log_normalized_percentage - percentage / 100.0) * bar_size as f32).round() as usize;
+    let filled_count = (decimal * bar_size as f32).round() as usize;
+    let semifilled_count = ((scaled_log_decimal - decimal) * bar_size as f32).floor() as usize;
     let unfilled_count = bar_size.saturating_sub(filled_count + semifilled_count);
 
     print!(
