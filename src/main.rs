@@ -86,7 +86,7 @@ fn main() {
         total_percentage += percentage;
 
         print!("{: <7}", cmd.count);
-        if !no_bar {
+        if !no_bar && bar_size > 0 {
             print_bar(percentage, total_percentage, bar_size);
         }
         println!(" {:<9} {:<}", format!("{:.2}%", percentage), cmd.name);
@@ -165,12 +165,12 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), Str
     let args: Vec<String> = env::args().collect();
 
     let mut file = &get_histfile();
-    let mut count = 25;
-    let mut all = false;
-    let mut more_than = 0;
     let mut ignore = String::new();
+    let mut all = false;
     let mut no_bar = false;
-    let mut bar_size = 25;
+    let mut bar_size: usize = 25;
+    let mut count: usize = 25;
+    let mut more_than: usize = 0;
 
     let mut i = 1;
     while i < args.len() {
@@ -184,7 +184,7 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), Str
             "-c" => {
                 i += 1;
                 if i < args.len() {
-                    count = args[i].parse().unwrap_or(25);
+                    count = parse_usize_argument(&args[i], "-c")?;
                 }
             }
             "-a" => {
@@ -193,7 +193,7 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), Str
             "-m" => {
                 i += 1;
                 if i < args.len() {
-                    more_than = args[i].parse().unwrap_or(1);
+                    more_than = parse_usize_argument(&args[i], "-m")?;
                 }
             }
             "-i" => {
@@ -203,12 +203,14 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), Str
                 }
             }
             "-n" => {
-                no_bar = true;
+                if i < args.len() {
+                    no_bar = true;
+                }
             }
             "-b" => {
                 i += 1;
                 if i < args.len() {
-                    bar_size = args[i].parse().unwrap_or(25);
+                    bar_size = parse_usize_argument(&args[i], "-b")?;
                 }
             }
             "-h" | "--help" => {
@@ -231,6 +233,14 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), Str
         no_bar,
         bar_size,
     ))
+}
+
+fn parse_usize_argument(arg: &str, flag: &str) -> Result<usize, String> {
+    match arg.parse() {
+        Ok(val) if val >= 1 || flag == "-m" => Ok(val),
+        Ok(_) => Err(format!("Error: {} needs to be positive", flag)),
+        Err(_) => Err(format!("Error: Invalid {} argument", flag)),
+    }
 }
 
 fn get_histfile() -> String {
