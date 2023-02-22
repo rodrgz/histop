@@ -24,6 +24,8 @@ Usage: histop [OPTIONS]
 -m <MORE_THAN>      Only consider commands used more than <MORE_THAN> times
 -i <IGNORE>         Ignore specified commands, e.g. "ls|grep|nvim"
 -n                  Do not print bar graph
+-np                 Do not print percentage
+-nl                 Do not print logarithmically scaled percentage
 -b <BAR_SIZE>       Size of bar graph [default: 25]
 -h, --help          Print this help message
 ▓▓                  Logarithmically Scaled Percentage

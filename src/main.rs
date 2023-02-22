@@ -14,7 +14,7 @@ fn main() {
         }
     };
 
-    let (hist_file, count, all, more_than, ignore, no_bar, bar_size) = args;
+    let (hist_file, count, all, more_than, ignore, no_bar, bar_size, no_log, no_perc) = args;
     let mut filtered_commands = vec!["sudo", "doas"];
     filtered_commands.extend(ignore.split('|').map(|s| s.trim()).collect::<Vec<_>>());
 
@@ -87,7 +87,7 @@ fn main() {
 
         print!("{: <7}", cmd.count);
         if !no_bar && bar_size > 0 {
-            print_bar(percentage, total_percentage, bar_size);
+            print_bar(percentage, total_percentage, bar_size, no_log, no_perc);
         }
         println!(" {:<9} {:<}", format!("{:.2}%", percentage), cmd.name);
     }
@@ -144,30 +144,54 @@ fn get_first_word<'a>(subcommand: &'a str, filtered_commands: &[&str]) -> &'a st
     ""
 }
 
-fn print_bar(percentage: f32, total_percentage: f32, bar_size: usize) {
-    let scaled_percentage = percentage * 100.0 / total_percentage;
-    let scaled_log_decimal = (scaled_percentage + 1.0).ln() / 100_f32.ln();
+fn print_bar(percentage: f32, total_percentage: f32, bar_size: usize, no_log: bool, no_perc: bool) {
+    let mut semifilled_count = 0;
+    let mut filled_count = 0;
+    let mut unfilled_count = 0;
+
     let decimal = percentage / 100.0;
 
-    let filled_count = (decimal * bar_size as f32).round() as usize;
-    let semifilled_count = ((scaled_log_decimal - decimal) * bar_size as f32).floor() as usize;
-    let unfilled_count = bar_size.saturating_sub(filled_count + semifilled_count);
+    match (!no_log, !no_perc) {
+        (true, true) => {
+            let scaled_percentage = percentage * 100.0 / total_percentage;
+            let scaled_log_decimal = (scaled_percentage + 1.0).ln() / 100_f32.ln();
+            semifilled_count = ((scaled_log_decimal - decimal) * bar_size as f32).floor() as usize;
+            filled_count = (decimal * bar_size as f32).round() as usize;
+            unfilled_count = (bar_size - filled_count - semifilled_count).min(bar_size);
+        }
+        (false, true) => {
+            filled_count = (decimal * bar_size as f32).round() as usize;
+            unfilled_count = (bar_size - filled_count).min(bar_size);
+            semifilled_count = 0;
+        }
+        (true, false) => {
+            let scaled_percentage = percentage * 100.0 / total_percentage;
+            let scaled_log_decimal = (scaled_percentage + 1.0).ln() / 100_f32.ln();
+            filled_count = (scaled_log_decimal * bar_size as f32).floor() as usize;
+            unfilled_count = (bar_size - filled_count).min(bar_size);
+        }
+        (_, _) => {}
+    }
 
-    print!(
-        "│{}{}{}│",
-        "░".repeat(unfilled_count),
-        "▓".repeat(semifilled_count),
-        "█".repeat(filled_count)
-    );
+    if unfilled_count + semifilled_count + filled_count > 0 {
+        print!(
+            "│{}{}{}│",
+            "░".repeat(unfilled_count),
+            "▓".repeat(semifilled_count),
+            "█".repeat(filled_count)
+        );
+    }
 }
 
-fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), String> {
+fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize, bool, bool), String> {
     let args: Vec<String> = env::args().collect();
 
     let mut file = &get_histfile();
     let mut ignore = String::new();
     let mut all = false;
     let mut no_bar = false;
+    let mut no_log = false;
+    let mut no_perc = false;
     let mut bar_size: usize = 25;
     let mut count: usize = 25;
     let mut more_than: usize = 0;
@@ -207,6 +231,17 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), Str
                     no_bar = true;
                 }
             }
+            "-nl" => {
+                if i < args.len() {
+                    no_log = true;
+                }
+            }
+            "-np" => {
+                if i < args.len() {
+                    no_perc = true;
+                }
+            }
+
             "-b" => {
                 i += 1;
                 if i < args.len() {
@@ -232,6 +267,8 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize), Str
         ignore,
         no_bar,
         bar_size,
+        no_log,
+        no_perc,
     ))
 }
 
@@ -271,6 +308,8 @@ fn print_help_message(count: usize, bar_size: usize) {
     println!("-m <MORE_THAN>      Only consider commands used more than <MORE_THAN> times");
     println!("-i <IGNORE>         Ignore specified commands, e.g. \"ls|grep|nvim\"");
     println!("-n                  Do not print bar graph");
+    println!("-np                 Do not print percentage");
+    println!("-nl                 Do not print logarithmically scaled percentage");
     println!(
         "-b <BAR_SIZE>       Size of bar graph [default: {}]",
         bar_size
