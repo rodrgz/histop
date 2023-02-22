@@ -1,4 +1,10 @@
-use std::{cmp::min, collections::HashMap, env, fs};
+use std::{
+    cmp,
+    collections::HashMap,
+    env, fs,
+    io::{BufRead, BufReader},
+    process,
+};
 
 struct Command {
     name: String,
@@ -10,7 +16,7 @@ fn main() {
         Ok(args) => args,
         Err(e) => {
             eprintln!("Error: {}", e);
-            std::process::exit(1);
+            process::exit(1);
         }
     };
 
@@ -19,19 +25,15 @@ fn main() {
     filtered_commands.extend(ignore.split('|').map(|s| s.trim()).collect::<Vec<_>>());
 
     // Read history file
-    let history = match fs::read_to_string(&hist_file) {
+    let hist_file = match fs::File::open(&hist_file) {
         Ok(hist_file) => hist_file,
-        // Handle file read error
+        // Handle file open error
         Err(e) => {
-            eprintln!("Error reading history file: {}", e);
+            eprintln!("Error opening history file: {}", e);
             return;
         }
     };
-
-    if history.is_empty() {
-        println!("History file is empty");
-        return;
-    }
+    let reader = BufReader::new(hist_file);
 
     // Initialize a hashmap to hold command count
     let mut cmd_count: HashMap<String, usize> = HashMap::new();
@@ -40,13 +42,22 @@ fn main() {
     let mut skip = false;
 
     // Iterate over lines in the history file
-    for line in history.lines() {
+    for line_result in reader.lines() {
+        let line = match line_result {
+            Ok(line) => line,
+            // Handle line read error
+            Err(e) => {
+                eprintln!("Error reading history file: {}", e);
+                return;
+            }
+        };
+
         match (skip, line.starts_with(": "), line.ends_with("\\")) {
             (false, false, false) => {
-                count_commands(&mut cmd_count, line, &filtered_commands);
+                count_commands(&mut cmd_count, &line, &filtered_commands);
             }
             (false, false, true) => {
-                count_commands(&mut cmd_count, line, &filtered_commands);
+                count_commands(&mut cmd_count, &line, &filtered_commands);
                 skip = true;
             }
             (false, true, _) => {
@@ -70,12 +81,12 @@ fn main() {
     }
 
     commands.retain(|cmd| cmd.count > more_than);
-    commands.sort_by_key(|cmd| std::cmp::Reverse(cmd.count));
+    commands.sort_by_key(|cmd| cmp::Reverse(cmd.count));
 
     let n = if all {
         commands.len()
     } else {
-        min(count, commands.len())
+        cmp::min(count, commands.len())
     };
 
     let total_count: usize = commands.iter().map(|cmd| cmd.count).sum();
@@ -250,7 +261,7 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize, bool
             }
             "-h" | "--help" => {
                 print_help_message(count, bar_size);
-                std::process::exit(0);
+                process::exit(0);
             }
             _ => {
                 return Err(format!("Invalid option: {}", args[i]));
@@ -281,11 +292,11 @@ fn parse_usize_argument(arg: &str, flag: &str) -> Result<usize, String> {
 }
 
 fn get_histfile() -> String {
-    std::env::var("HISTFILE").unwrap_or_else(|_| {
-        let user = std::env::var("USER").unwrap_or_default();
-        let shell = std::env::var("SHELL").unwrap_or_default();
+    env::var("HISTFILE").unwrap_or_else(|_| {
+        let user = env::var("USER").unwrap_or_default();
+        let shell = env::var("SHELL").unwrap_or_default();
         if shell.ends_with("zsh") {
-            match std::fs::metadata(format!("/home/{}/.config/zsh/.zsh_history", user)) {
+            match fs::metadata(format!("/home/{}/.config/zsh/.zsh_history", user)) {
                 Ok(_) => format!("/home/{}/.config/zsh/.zsh_history", user),
                 Err(_) => format!("/home/{}/.zsh_history", user),
             }
