@@ -45,10 +45,14 @@ fn main() {
     for line_result in reader.lines() {
         let line = match line_result {
             Ok(line) => line,
-            // Handle line read error
             Err(e) => {
-                eprintln!("Error reading history file: {}", e);
-                return;
+                if e.kind() == std::io::ErrorKind::InvalidData {
+                    eprintln!("Non-UTF-8 character detected in input stream, skipping line");
+                    continue;
+                } else {
+                    eprintln!("Error reading history file: {}", e);
+                    break;
+                }
             }
         };
 
