@@ -110,25 +110,36 @@ fn main() {
 }
 
 fn count_commands(cmd_count: &mut HashMap<String, usize>, line: &str, filtered_commands: &[&str]) {
-    let cleaned_line = clean_line(line);
-    for subcommand in cleaned_line.split('|') {
-        let first_word = get_first_word(subcommand, filtered_commands);
+    if line.contains("|") {
+        let cleaned_line = clean_line(line);
+        for subcommand in cleaned_line.split('|') {
+            let first_word = get_first_word(subcommand, filtered_commands);
+            if !first_word.is_empty() {
+                cmd_count
+                    .entry(first_word.to_string())
+                    .and_modify(|count| *count += 1)
+                    .or_default();
+            }
+        }
+    } else {
+        let first_word = get_first_word(line, filtered_commands);
         if !first_word.is_empty() {
-            *cmd_count.entry(first_word.to_string()).or_default() += 1;
+            cmd_count
+                .entry(first_word.to_string())
+                .and_modify(|count| *count += 1)
+                .or_default();
         }
     }
 }
 
 fn clean_line(line: &str) -> String {
-    let mut cleaned_line = String::with_capacity(line.len());
+    let mut cleaned_line = line.clone().to_string();
     let mut in_quotes = false;
     for c in line.chars() {
         if c == '\'' || c == '\"' {
             in_quotes = !in_quotes;
         } else if c == '|' && in_quotes {
             cleaned_line.push(' ');
-        } else {
-            cleaned_line.push(c);
         }
     }
     cleaned_line
@@ -136,25 +147,16 @@ fn clean_line(line: &str) -> String {
 
 fn get_first_word<'a>(subcommand: &'a str, filtered_commands: &[&str]) -> &'a str {
     for w in subcommand.trim().split_whitespace() {
-        if filtered_commands.contains(&w) {
-            break;
-        }
-        if w.contains('=') {
+        if filtered_commands.contains(&w) || w.contains('=') {
             continue;
-        } else if w.starts_with('\\') {
-            if w.len() > 1 {
-                if filtered_commands.contains(&&w[1..]) {
-                    continue;
-                } else {
-                    return &w[1..];
-                }
-            }
-        } else {
-            if filtered_commands.contains(&w) || w.contains('=') {
+        } else if w.starts_with('\\') && w.len() > 1 {
+            if filtered_commands.contains(&&w[1..]) {
                 continue;
             } else {
-                return w;
+                return &w[1..];
             }
+        } else {
+            return w;
         }
     }
     ""
