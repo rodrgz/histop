@@ -166,8 +166,11 @@ fn print_bar(percentage: f32, total_percentage: f32, bar_size: usize, no_log: bo
         (true, true) => {
             let scaled_percentage = percentage * 100.0 / total_percentage;
             let scaled_log_decimal = (scaled_percentage + 1.0).ln() / 100_f32.ln();
-            semifilled_count = ((scaled_log_decimal - decimal) * bar_size as f32).floor() as usize;
+            semifilled_count = ((scaled_log_decimal - decimal) * bar_size as f32).round() as usize;
             filled_count = (decimal * bar_size as f32).round() as usize;
+            if filled_count + semifilled_count > bar_size {
+                semifilled_count = bar_size - filled_count;
+            };
             unfilled_count = (bar_size - filled_count - semifilled_count).min(bar_size);
         }
         (false, true) => {
@@ -178,7 +181,7 @@ fn print_bar(percentage: f32, total_percentage: f32, bar_size: usize, no_log: bo
         (true, false) => {
             let scaled_percentage = percentage * 100.0 / total_percentage;
             let scaled_log_decimal = (scaled_percentage + 1.0).ln() / 100_f32.ln();
-            filled_count = (scaled_log_decimal * bar_size as f32).floor() as usize;
+            filled_count = (scaled_log_decimal * bar_size as f32).round() as usize;
             unfilled_count = (bar_size - filled_count).min(bar_size);
         }
         (_, _) => {}
