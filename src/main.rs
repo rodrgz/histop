@@ -6,8 +6,9 @@ use std::{
     process,
 };
 
-struct Command {
-    name: String,
+// Struct to hold command name and count
+struct Command<'a> {
+    name: &'a str,
     count: usize,
 }
 
@@ -79,7 +80,7 @@ fn main() {
     let mut commands = Vec::with_capacity(cmd_count.len());
     for (name, count) in &cmd_count {
         commands.push(Command {
-            name: name.to_string(),
+            name,
             count: *count,
         });
     }
