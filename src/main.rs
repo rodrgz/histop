@@ -42,13 +42,18 @@ fn main() {
     // Initialize variables to hold command and skip flag
     let mut skip = false;
 
+    let mut non_utf8 = false;
+
     // Iterate over lines in the history file
     for line_result in reader.lines() {
         let line = match line_result {
             Ok(line) => line,
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::InvalidData {
-                    eprintln!("Non-UTF-8 character detected in input stream, skipping line");
+                    if !non_utf8 {
+                        eprintln!("Non-UTF-8 character detected in input stream, skipping line");
+                        non_utf8 = true;
+                    }
                     continue;
                 } else {
                     eprintln!("Error reading history file: {}", e);
@@ -262,7 +267,6 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize, bool
                     no_perc = true;
                 }
             }
-
             "-b" => {
                 i += 1;
                 if i < args.len() {
