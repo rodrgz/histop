@@ -102,15 +102,49 @@ fn main() {
     let total_count: usize = commands.iter().map(|cmd| cmd.count).sum();
     let mut total_percentage = 0.0;
 
+    let padding_str = " ".repeat(3);
+    let mut padding_count = 0;
+    let mut padding_percentage = 0;
+    let mut old_count_len = 0;
+    let mut old_percentage_len = 0;
+    let mut i = 1;
+
     for (cmd, _) in commands.iter().zip(0..n) {
         let percentage = cmd.count as f32 / total_count as f32 * 100.0;
+        let percentage_formated = format!("{:.2}%", percentage);
         total_percentage += percentage;
 
-        print!("{: <7}", cmd.count);
+        if i == 1 {
+            old_count_len = cmd.count.to_string().len();
+            old_percentage_len = percentage_formated.len();
+        }
+
+        let count_len = cmd.count.to_string().len();
+        let percentage_len = percentage_formated.len();
+
+        let diff_count = old_count_len - count_len;
+        let diff_percentage = old_percentage_len - percentage_len;
+        padding_count = padding_count.max(diff_count);
+        padding_percentage = padding_percentage.max(diff_percentage);
+        old_count_len = count_len;
+        old_percentage_len = percentage_len;
+
+        print!("{}{}{}", " ".repeat(padding_count), cmd.count, padding_str,);
+
         if !no_bar && bar_size > 0 {
             print_bar(percentage, total_percentage, bar_size, no_log, no_perc);
         }
-        println!(" {:<9} {:<}", format!("{:.2}%", percentage), cmd.name);
+
+        print!(
+            "{}{}{}{}",
+            " ".repeat(padding_percentage),
+            percentage_formated,
+            padding_str,
+            cmd.name,
+        );
+        println!();
+
+        i += 1;
     }
 }
 
@@ -201,7 +235,7 @@ fn print_bar(percentage: f32, total_percentage: f32, bar_size: usize, no_log: bo
 
     if unfilled_count + semifilled_count + filled_count > 0 {
         print!(
-            "│{}{}{}│",
+            "│{}{}{}│ ",
             "░".repeat(unfilled_count),
             "▓".repeat(semifilled_count),
             "█".repeat(filled_count)
