@@ -21,7 +21,7 @@ fn main() {
         }
     };
 
-    let (hist_file, count, all, more_than, ignore, no_bar, bar_size, no_log, no_perc) = args;
+    let (hist_file, count, all, more_than, ignore, no_bar, bar_size, no_cum, no_perc) = args;
     let mut filtered_commands = vec!["sudo", "doas"];
     filtered_commands.extend(ignore.split('|').map(|s| s.trim()).collect::<Vec<_>>());
 
@@ -100,7 +100,7 @@ fn main() {
     };
 
     let total_count: usize = commands.iter().map(|cmd| cmd.count).sum();
-    let mut total_percentage = 0.0;
+    let mut cumulative_percentage = 100.0;
 
     let padding_str = " ".repeat(3);
     let mut padding_count = 0;
@@ -112,7 +112,6 @@ fn main() {
     for (cmd, _) in commands.iter().zip(0..n) {
         let percentage = cmd.count as f32 / total_count as f32 * 100.0;
         let percentage_formated = format!("{:.2}%", percentage);
-        total_percentage += percentage;
 
         if i == 1 {
             old_count_len = cmd.count.to_string().len();
@@ -126,13 +125,14 @@ fn main() {
         let diff_percentage = old_percentage_len - percentage_len;
         padding_count = padding_count.max(diff_count);
         padding_percentage = padding_percentage.max(diff_percentage);
-        old_count_len = count_len;
+        old_count_len = count_len + diff_count;
         old_percentage_len = percentage_len;
 
         print!("{}{}{}", " ".repeat(padding_count), cmd.count, padding_str,);
 
         if !no_bar && bar_size > 0 {
-            print_bar(percentage, total_percentage, bar_size, no_log, no_perc);
+            print_bar(percentage, cumulative_percentage, bar_size, no_cum, no_perc);
+            cumulative_percentage -= percentage;
         }
 
         print!(
@@ -201,18 +201,23 @@ fn get_first_word<'a>(subcommand: &'a str, filtered_commands: &[&str]) -> &'a st
     ""
 }
 
-fn print_bar(percentage: f32, total_percentage: f32, bar_size: usize, no_log: bool, no_perc: bool) {
+fn print_bar(
+    percentage: f32,
+    cumulative_percentage: f32,
+    bar_size: usize,
+    no_cum: bool,
+    no_perc: bool,
+) {
     let mut semifilled_count = 0;
     let mut filled_count = 0;
     let mut unfilled_count = 0;
 
     let decimal = percentage / 100.0;
+    let cumulative_decimal = cumulative_percentage / 100.0;
 
-    match (!no_log, !no_perc) {
+    match (!no_cum, !no_perc) {
         (true, true) => {
-            let scaled_percentage = percentage * 100.0 / total_percentage;
-            let scaled_log_decimal = (scaled_percentage + 1.0).ln() / 100_f32.ln();
-            semifilled_count = ((scaled_log_decimal - decimal) * bar_size as f32).round() as usize;
+            semifilled_count = ((cumulative_decimal - decimal) * bar_size as f32).round() as usize;
             filled_count = (decimal * bar_size as f32).round() as usize;
             if filled_count + semifilled_count > bar_size {
                 semifilled_count = bar_size - filled_count;
@@ -222,13 +227,10 @@ fn print_bar(percentage: f32, total_percentage: f32, bar_size: usize, no_log: bo
         (false, true) => {
             filled_count = (decimal * bar_size as f32).round() as usize;
             unfilled_count = (bar_size - filled_count).min(bar_size);
-            semifilled_count = 0;
         }
         (true, false) => {
-            let scaled_percentage = percentage * 100.0 / total_percentage;
-            let scaled_log_decimal = (scaled_percentage + 1.0).ln() / 100_f32.ln();
-            filled_count = (scaled_log_decimal * bar_size as f32).round() as usize;
-            unfilled_count = (bar_size - filled_count).min(bar_size);
+            semifilled_count = (cumulative_decimal * bar_size as f32).round() as usize;
+            unfilled_count = (bar_size - semifilled_count).min(bar_size);
         }
         (_, _) => {}
     }
@@ -250,7 +252,7 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize, bool
     let mut ignore = String::new();
     let mut all = false;
     let mut no_bar = false;
-    let mut no_log = false;
+    let mut no_cum = false;
     let mut no_perc = false;
     let mut bar_size: usize = 25;
     let mut count: usize = 25;
@@ -291,9 +293,9 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize, bool
                     no_bar = true;
                 }
             }
-            "-nl" => {
+            "-nc" => {
                 if i < args.len() {
-                    no_log = true;
+                    no_cum = true;
                 }
             }
             "-np" => {
@@ -326,7 +328,7 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize, bool
         ignore,
         no_bar,
         bar_size,
-        no_log,
+        no_cum,
         no_perc,
     ))
 }
@@ -368,12 +370,12 @@ fn print_help_message(count: usize, bar_size: usize) {
     println!("-i <IGNORE>         Ignore specified commands, e.g. \"ls|grep|nvim\"");
     println!("-n                  Do not print bar graph");
     println!("-np                 Do not print percentage");
-    println!("-nl                 Do not print logarithmically scaled percentage");
+    println!("-nc                 Do not print cumulative percentage");
     println!(
         "-b <BAR_SIZE>       Size of bar graph [default: {}]",
         bar_size
     );
     println!("-h, --help          Print this help message");
-    println!("▓▓                  Logarithmically Scaled Percentage");
+    println!("▓▓                  Cumulative Percentage");
     println!("██                  Percentage");
 }

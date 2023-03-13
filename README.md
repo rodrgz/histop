@@ -25,10 +25,10 @@ Usage: histop [OPTIONS]
 -i <IGNORE>         Ignore specified commands, e.g. "ls|grep|nvim"
 -n                  Do not print bar graph
 -np                 Do not print percentage
--nl                 Do not print logarithmically scaled percentage
+-nc                 Do not print cumulative percentage
 -b <BAR_SIZE>       Size of bar graph [default: 25]
 -h, --help          Print this help message
-▓▓                  Logarithmically Scaled Percentage
+▓▓                  Cumulative Percentage
 ██                  Percentage
 ```
 
