@@ -6,4 +6,4 @@ description = "Show your most frequently used bash/zsh commands in a visually ap
 license = "MIT"
 
 [profile.release]
-lto = "thin"
+lto = true
