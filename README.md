@@ -17,35 +17,35 @@ cargo build #or nix build
 
 ```
 $ histop -h 
-Usage: histop [OPTIONS]
--f <FILE>           Path to history file
--c <COUNT>          Number of commands to print [default: 25]
--a                  Print all commands
--m <MORE_THAN>      Only consider commands used more than <MORE_THAN> times
--i <IGNORE>         Ignore specified commands, e.g. "ls|grep|nvim"
--n                  Do not print bar graph
--np                 Do not print percentage
--nc                 Do not print cumulative percentage
--b <BAR_SIZE>       Size of bar graph [default: 25]
--h, --help          Print this help message
-▓▓                  Cumulative Percentage
-██                  Percentage
+Usage: histop [options]
+ -h, --help       Print this help message
+ -f <FILE>        Path to the history file
+ -c <COUNT>       Number of commands to print (default: 25)
+ -a               Print all commands (overrides -c)
+ -m <MORE_THAN>   Only consider commands used more than <MORE_THAN> times
+ -i <IGNORE>      Ignore specified commands (e.g. "ls|grep|nvim")
+ -b <BAR_SIZE>    Size of the bar graph (default: 25)
+ -n               Do not print the bar
+ -np              Do not print the percentage in the bar
+ -nc              Do not print the cumulative percentage in the bar
+ ██               Percentage
+ ▓▓               Cumulative percentage
 ```
 
 ## Example
 
 ```
-$ histop -f ~/.zsh_history -c 10
-1441   │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓███│ 13.79%    exa
-995    │░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██│ 9.52%     z
-910    │░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██│ 8.71%     hx
-507    │░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓█│ 4.85%     rg
-280    │░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓█│ 2.68%     cargo
-256    │░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓█│ 2.45%     nix
-219    │░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓█│ 2.10%     dust
-201    │░░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓│ 1.92%     :q
-190    │░░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓│ 1.82%     git
-188    │░░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓│ 1.80%     histop
+$ histop -c 10 -i "cd"
+1184   │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓█████│ 19.08%   ls
+ 943   │░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓████│ 15.19%   nvim
+ 792   │░░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓███│ 12.76%   git
+ 670   │░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓███│ 10.80%   nix
+ 311   │░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓█│  5.01%   rg
+ 310   │░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓█│  5.00%   exit
+ 255   │░░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓█│  4.11%   dust
+ 253   │░░░░░░░░░░░░░░░░░░▓▓▓▓▓▓█│  4.08%   histop
+ 233   │░░░░░░░░░░░░░░░░░░░▓▓▓▓▓█│  3.75%   cargo
+ 219   │░░░░░░░░░░░░░░░░░░░░▓▓▓▓█│  3.53%   man
 ```
 
 ## Requirements

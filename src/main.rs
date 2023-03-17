@@ -261,6 +261,10 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize, bool
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
+            "-h" | "--help" => {
+                print_help_message(count, bar_size);
+                process::exit(0);
+            }
             "-f" => {
                 i += 1;
                 if i < args.len() {
@@ -288,14 +292,15 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize, bool
                     ignore = args[i].clone();
                 }
             }
+            "-b" => {
+                i += 1;
+                if i < args.len() {
+                    bar_size = parse_usize_argument(&args[i], "-b")?;
+                }
+            }
             "-n" => {
                 if i < args.len() {
                     no_bar = true;
-                }
-            }
-            "-nc" => {
-                if i < args.len() {
-                    no_cum = true;
                 }
             }
             "-np" => {
@@ -303,15 +308,10 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize, bool
                     no_perc = true;
                 }
             }
-            "-b" => {
-                i += 1;
+            "-nc" => {
                 if i < args.len() {
-                    bar_size = parse_usize_argument(&args[i], "-b")?;
+                    no_cum = true;
                 }
-            }
-            "-h" | "--help" => {
-                print_help_message(count, bar_size);
-                process::exit(0);
             }
             _ => {
                 return Err(format!("Invalid option: {}", args[i]));
@@ -359,23 +359,17 @@ fn get_histfile() -> String {
 }
 
 fn print_help_message(count: usize, bar_size: usize) {
-    println!("Usage: histop [OPTIONS]");
-    println!("-f <FILE>           Path to history file");
-    println!(
-        "-c <COUNT>          Number of commands to print [default: {}]",
-        count
-    );
-    println!("-a                  Print all commands");
-    println!("-m <MORE_THAN>      Only consider commands used more than <MORE_THAN> times");
-    println!("-i <IGNORE>         Ignore specified commands, e.g. \"ls|grep|nvim\"");
-    println!("-n                  Do not print bar graph");
-    println!("-np                 Do not print percentage");
-    println!("-nc                 Do not print cumulative percentage");
-    println!(
-        "-b <BAR_SIZE>       Size of bar graph [default: {}]",
-        bar_size
-    );
-    println!("-h, --help          Print this help message");
-    println!("▓▓                  Cumulative Percentage");
-    println!("██                  Percentage");
+    println!("Usage: histop [options]");
+    println!(" -h, --help       Print this help message");
+    println!(" -f <FILE>        Path to the history file");
+    println!(" -c <COUNT>       Number of commands to print (default: {})", count);
+    println!(" -a               Print all commands (overrides -c)");
+    println!(" -m <MORE_THAN>   Only consider commands used more than <MORE_THAN> times");
+    println!(" -i <IGNORE>      Ignore specified commands (e.g. \"ls|grep|nvim\")");
+    println!(" -b <BAR_SIZE>    Size of the bar graph (default: {})", bar_size);
+    println!(" -n               Do not print the bar");
+    println!(" -np              Do not print the percentage in the bar");
+    println!(" -nc              Do not print the cumulative percentage in the bar");
+    println!(" ██               Percentage");
+    println!(" ▓▓               Cumulative percentage");
 }
