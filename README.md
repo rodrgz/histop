@@ -27,9 +27,9 @@ Usage: histop [options]
  -b <BAR_SIZE>    Size of the bar graph (default: 25)
  -n               Do not print the bar
  -np              Do not print the percentage in the bar
- -nc              Do not print the cumulative percentage in the bar
+ -nc              Do not print the inverse cumulative percentage in the bar
  ██               Percentage
- ▓▓               Cumulative percentage
+ ▓▓               Inverse cumulative percentage
 ```
 
 ## Example
