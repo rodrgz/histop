@@ -334,10 +334,9 @@ fn parse_args() -> Result<(String, usize, bool, usize, String, bool, usize, bool
 }
 
 fn parse_usize_argument(arg: &str, flag: &str) -> Result<usize, String> {
-    match arg.parse() {
-        Ok(val) if val >= 1 || flag == "-m" => Ok(val),
-        Ok(_) => Err(format!("Error: {} needs to be positive", flag)),
-        Err(_) => Err(format!("Error: Invalid {} argument", flag)),
+    match arg.parse::<usize>() {
+        Ok(val) if val > 0 => Ok(val),
+        _ => Err(format!("Invalid {} argument, must be a positive integer", flag)),
     }
 }
 
