@@ -44,8 +44,7 @@ fn main() {
     filtered_commands
         .extend(ignore.split('|').map(|s| s.trim()).collect::<Vec<_>>());
 
-    let mut skip = false;
-    let mut non_utf8 = false;
+    let (mut skip, mut non_utf8) = (false, false);
     let mut cmd_count: HashMap<String, usize> = HashMap::new();
 
     for line_result in reader.lines() {
@@ -95,11 +94,9 @@ fn main() {
 
     let total_count: usize = commands.iter().map(|cmd| cmd.count).sum();
     let padding_str = " ".repeat(3);
-    let mut padding_count = 0;
-    let mut padding_perc = 0;
-    let mut old_count_len = 0;
-    let mut old_perc_len = 0;
-    let mut inv_cum_perc = 100.0;
+    let (mut padding_count, mut padding_perc) = (0, 0);
+    let (mut old_count_len, mut old_perc_len) = (0, 0);
+    let mut inv_cumu_perc = 100.0;
     let mut first_loop = true;
 
     let n = if all { commands.len() } else { cmp::min(count, commands.len()) };
@@ -127,8 +124,8 @@ fn main() {
         print!("{}{}{}", " ".repeat(padding_count), cmd.count, padding_str,);
 
         if !no_bar && bar_size > 0 {
-            print_bar(perc, inv_cum_perc, bar_size, no_cumu, no_perc);
-            inv_cum_perc -= perc;
+            print_bar(perc, inv_cumu_perc, bar_size, no_cumu, no_perc);
+            inv_cumu_perc -= perc;
         }
 
         print!(
@@ -211,9 +208,8 @@ fn print_bar(
 ) {
     let dec = perc / 100.0;
     let inv_cumu_dec = inv_cumu_perc / 100.0;
-    let mut semifilled_count = 0;
-    let mut filled_count = 0;
-    let mut unfilled_count = 0;
+    let (mut semifilled_count, mut filled_count, mut unfilled_count) =
+        (0, 0, 0);
 
     match (!no_cumu, !no_perc) {
         (true, true) => {
@@ -252,15 +248,13 @@ fn parse_args(
 ) -> Result<(String, usize, bool, usize, String, usize, bool, bool, bool), String>
 {
     let args: Vec<String> = env::args().collect();
-    let mut all = false;
-    let mut no_bar = false;
-    let mut no_cumu = false;
-    let mut no_perc = false;
-    let mut bar_size: usize = 25;
-    let mut count: usize = 25;
-    let mut more_than: usize = 0;
     let mut file = &get_histfile();
+    let mut count: usize = 25;
+    let mut all = false;
+    let mut more_than: usize = 0;
     let mut ignore = String::new();
+    let mut bar_size: usize = 25;
+    let (mut no_bar, mut no_cumu, mut no_perc) = (false, false, false);
 
     let mut i = 1;
     while i < args.len() {
