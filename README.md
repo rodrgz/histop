@@ -28,6 +28,7 @@ Usage: histop [options]
  -n               Do not print the bar
  -np              Do not print the percentage in the bar
  -nc              Do not print the inverse cumulative percentage in the bar
+ -v               Verbose
  ██               Percentage
  ▓▓               Inverse cumulative percentage
 ```

@@ -29,6 +29,7 @@ fn main() {
         no_bar,
         no_cumu,
         no_perc,
+        verb,
     ) = args;
 
     let hist_file = match fs::File::open(&hist_file) {
@@ -53,7 +54,9 @@ fn main() {
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::InvalidData {
                     if !non_utf8 {
-                        eprintln!("Non-UTF-8 character detected in input stream, skipping line");
+                        if verb {
+                            eprintln!("Non-UTF-8 character detected in input stream, skipping line");
+                        }
                         non_utf8 = true;
                     }
                     continue;
@@ -244,9 +247,10 @@ fn print_bar(
     }
 }
 
-fn parse_args(
-) -> Result<(String, usize, bool, usize, String, usize, bool, bool, bool), String>
-{
+fn parse_args() -> Result<
+    (String, usize, bool, usize, String, usize, bool, bool, bool, bool),
+    String,
+> {
     let args: Vec<String> = env::args().collect();
     let mut file = &get_histfile();
     let mut count: usize = 25;
@@ -255,6 +259,7 @@ fn parse_args(
     let mut ignore = String::new();
     let mut bar_size: usize = 25;
     let (mut no_bar, mut no_cumu, mut no_perc) = (false, false, false);
+    let mut verb = false;
 
     let mut i = 1;
     while i < args.len() {
@@ -311,6 +316,11 @@ fn parse_args(
                     no_cumu = true;
                 }
             }
+            "-v" => {
+                if i < args.len() {
+                    verb = true;
+                }
+            }
             _ => {
                 return Err(format!("Invalid option: {}", args[i]));
             }
@@ -328,6 +338,7 @@ fn parse_args(
         no_bar,
         no_cumu,
         no_perc,
+        verb,
     ))
 }
 
@@ -381,6 +392,7 @@ fn print_help_message(
         \u{A0}-n               Do not print the bar\n\
         \u{A0}-np              Do not print the percentage in the bar\n\
         \u{A0}-nc              Do not print the inverse cumulative percentage in the bar\n\
+        \u{A0}-v               Verbose
         \u{A0}██               Percentage\n\
         \u{A0}▓▓               Inverse cumulative percentage",
         count, bar_size);
