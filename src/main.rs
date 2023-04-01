@@ -392,7 +392,7 @@ fn print_help_message(
         \u{A0}-n               Do not print the bar\n\
         \u{A0}-np              Do not print the percentage in the bar\n\
         \u{A0}-nc              Do not print the inverse cumulative percentage in the bar\n\
-        \u{A0}-v               Verbose
+        \u{A0}-v               Verbose\n\
         \u{A0}██               Percentage\n\
         \u{A0}▓▓               Inverse cumulative percentage",
         count, bar_size);
