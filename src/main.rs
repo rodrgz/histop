@@ -1,8 +1,11 @@
 use std::{
     cmp,
     collections::HashMap,
-    env, fs,
+    env,
+    error::Error,
+    fs,
     io::{BufRead, BufReader},
+    path::{Path, PathBuf},
     process,
 };
 
@@ -252,7 +255,7 @@ fn parse_args() -> Result<
     String,
 > {
     let args: Vec<String> = env::args().collect();
-    let mut file = &get_histfile();
+    let mut file = String::new();
     let mut count: usize = 25;
     let mut all = false;
     let mut more_than: usize = 0;
@@ -271,7 +274,7 @@ fn parse_args() -> Result<
             "-f" => {
                 i += 1;
                 if i < args.len() {
-                    file = &args[i];
+                    file = args[i].clone();
                 }
             }
             "-c" => {
@@ -328,6 +331,16 @@ fn parse_args() -> Result<
         i += 1;
     }
 
+    if file.is_empty() {
+        file = match get_histfile() {
+            Ok(s) => s,
+            Err(_) => {
+                println!("Could not determine shell history file.");
+                process::exit(1);
+            }
+        };
+    }
+
     Ok((
         file.to_string(),
         count,
@@ -355,26 +368,57 @@ fn parse_usize_argument(
     }
 }
 
-fn get_histfile() -> String {
-    env::var("HISTFILE").unwrap_or_else(|_| {
-        let user = env::var("USER").unwrap_or_default();
-        let shell = env::var("SHELL").unwrap_or_default();
-        if shell.ends_with("zsh") {
-            match fs::metadata(format!(
-                "/home/{}/.config/zsh/.zsh_history",
-                user
-            )) {
-                Ok(_) => format!("/home/{}/.config/zsh/.zsh_history", user),
-                Err(_) => {
-                    format!("/home/{}/.zsh_history", user)
-                }
+fn get_histfile() -> Result<String, Box<dyn Error>> {
+    if let Ok(histfile) = env::var("HISTFILE") {
+        if let Ok(metadata) = fs::metadata(&histfile) {
+            if metadata.is_file() {
+                return Ok(histfile);
             }
-        } else if shell.ends_with("bash") {
-            format!("/home/{}/.bash_history", user)
         } else {
-            String::new()
+            eprintln!("HISTFILE does not exist");
+            return Err("HISTFILE does not exist".into());
         }
-    })
+    }
+
+    let user = env::var("USER").unwrap_or_default();
+
+    let stat_contents = fs::read_to_string("/proc/self/stat").unwrap();
+    let fields: Vec<&str> = stat_contents.split_whitespace().collect();
+    let ppid = fields[3];
+
+    let cmdline_file = PathBuf::from(format!("/proc/{}/cmdline", ppid));
+    let cmdline_contents = fs::read_to_string(cmdline_file).unwrap();
+    let parent_cmdline = Path::new(&cmdline_contents)
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .trim_end_matches('\0');
+
+    match parent_cmdline {
+        "ash" => Ok(format!("/home/{}/.ash_history", user)),
+        "bash" => Ok(format!("/home/{}/.bash_history", user)),
+        "fish" => {
+            eprintln!("Fish shell not yet implemented");
+            Err("Fish shell not yet implemented".into())
+        }
+        "zsh" => {
+            let histfile = format!("/home/{}/.config/zsh/.zsh_history", user);
+            if let Ok(metadata) = fs::metadata(&histfile) {
+                if metadata.is_file() {
+                    Ok(histfile)
+                } else {
+                    Ok(format!("/home/{}/.zsh_history", user))
+                }
+            } else {
+                Err(format!("Could not read metadata for {}", histfile).into())
+            }
+        }
+        _ => {
+            eprintln!("Unknown shell");
+            Err("Unknown shell".into())
+        }
+    }
 }
 
 fn print_help_message(
