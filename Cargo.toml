@@ -4,6 +4,3 @@ version = "0.0.1"
 edition = "2021"
 description = "Show your most frequently used bash/zsh commands in a visually appealing and easy-to-understand format."
 license = "MIT"
-
-[profile.release]
-lto = true
