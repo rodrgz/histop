@@ -49,6 +49,11 @@ $ histop -c 10 -i "cd"
  219   │░░░░░░░░░░░░░░░░░░░░▓▓▓▓█│  3.53%   man
 ```
 
+## How to use in Fish shell
+```
+$ history >~/.local/share/fish/history && histop -f ~/.local/share/fish/history
+```
+
 ## Requirements
 
 1. Rust 1.46 or later

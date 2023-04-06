@@ -399,8 +399,12 @@ fn get_histfile() -> Result<String, Box<dyn Error>> {
         "ash" => Ok(format!("/home/{}/.ash_history", user)),
         "bash" => Ok(format!("/home/{}/.bash_history", user)),
         "fish" => {
-            eprintln!("Fish shell not yet implemented");
-            Err("Fish shell not yet implemented".into())
+            eprintln!(
+                "How to use in Fish Shell\n\
+                history >~/.local/share/fish/history && \
+                histop -f ~/.local/share/fish/history"
+            );
+            process::exit(1);
         }
         "zsh" => {
             let histfile = format!("/home/{}/.config/zsh/.zsh_history", user);
