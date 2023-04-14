@@ -173,15 +173,29 @@ fn count_commands(
 }
 
 fn clean_line(line: &str) -> String {
-    let mut in_quotes = false;
-    let mut cleaned_line = line.clone().to_string();
+    let mut in_single_quotes = false;
+    let mut in_double_quotes = false;
+    let mut cleaned_line = String::with_capacity(line.len());
+
     for c in line.chars() {
-        if c == '\'' || c == '\"' {
-            in_quotes = !in_quotes;
-        } else if c == '|' && in_quotes {
-            cleaned_line.push(' ');
+        match c {
+            '\'' => {
+                in_single_quotes = !in_single_quotes;
+                cleaned_line.push(c);
+            }
+            '\"' => {
+                in_double_quotes = !in_double_quotes;
+                cleaned_line.push(c);
+            }
+            '|' if in_single_quotes || in_double_quotes => {
+                cleaned_line.push(' ');
+            }
+            _ => {
+                cleaned_line.push(c);
+            }
         }
     }
+
     cleaned_line
 }
 
