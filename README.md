@@ -26,6 +26,7 @@ Usage: histop [options]
  -i <IGNORE>      Ignore specified commands (e.g. "ls|grep|nvim")
  -b <BAR_SIZE>    Size of the bar graph (default: 25)
  -n               Do not print the bar
+ -nh              Disable history mode (can be used for any data)
  -np              Do not print the percentage in the bar
  -nc              Do not print the inverse cumulative percentage in the bar
  -v               Verbose

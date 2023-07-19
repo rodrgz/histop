@@ -30,6 +30,7 @@ fn main() {
         ignore,
         bar_size,
         no_bar,
+        no_hist,
         no_cumu,
         no_perc,
         verb,
@@ -44,7 +45,11 @@ fn main() {
     };
     let reader = BufReader::new(hist_file);
 
-    let mut filtered_commands = vec!["sudo", "doas"];
+    let mut filtered_commands = vec![];
+    if !no_hist {
+        filtered_commands = vec!["sudo", "doas"];
+    }
+
     filtered_commands
         .extend(ignore.split('|').map(|s| s.trim()).collect::<Vec<_>>());
 
@@ -72,10 +77,20 @@ fn main() {
 
         match (skip, line.starts_with(": "), line.ends_with("\\")) {
             (false, false, false) => {
-                count_commands(&mut cmd_count, &line, &filtered_commands);
+                count_commands(
+                    &mut cmd_count,
+                    &line,
+                    &filtered_commands,
+                    no_hist,
+                );
             }
             (false, false, true) => {
-                count_commands(&mut cmd_count, &line, &filtered_commands);
+                count_commands(
+                    &mut cmd_count,
+                    &line,
+                    &filtered_commands,
+                    no_hist,
+                );
                 skip = true;
             }
             (false, true, _) => {
@@ -149,8 +164,9 @@ fn count_commands(
     cmd_count: &mut HashMap<String, usize>,
     line: &str,
     filtered_commands: &[&str],
+    not_hist: bool,
 ) {
-    if line.contains("|") {
+    if line.contains("|") && !not_hist {
         let cleaned_line = clean_line(line);
         for subcommand in cleaned_line.split('|') {
             let first_word = get_first_word(subcommand, filtered_commands);
@@ -265,7 +281,7 @@ fn print_bar(
 }
 
 fn parse_args() -> Result<
-    (String, usize, bool, usize, String, usize, bool, bool, bool, bool),
+    (String, usize, bool, usize, String, usize, bool, bool, bool, bool, bool),
     String,
 > {
     let args: Vec<String> = env::args().collect();
@@ -275,7 +291,10 @@ fn parse_args() -> Result<
     let mut more_than: usize = 0;
     let mut ignore = String::new();
     let mut bar_size: usize = 25;
-    let (mut no_bar, mut no_cumu, mut no_perc) = (false, false, false);
+    let mut no_bar = false;
+    let mut no_hist = false;
+    let mut no_cumu = false;
+    let mut no_perc = false;
     let mut verb = false;
 
     let mut i = 1;
@@ -323,6 +342,11 @@ fn parse_args() -> Result<
                     no_bar = true;
                 }
             }
+            "-nh" => {
+                if i < args.len() {
+                    no_hist = true;
+                }
+            }
             "-np" => {
                 if i < args.len() {
                     no_perc = true;
@@ -363,6 +387,7 @@ fn parse_args() -> Result<
         ignore,
         bar_size,
         no_bar,
+        no_hist,
         no_cumu,
         no_perc,
         verb,
@@ -452,6 +477,7 @@ fn print_help_message(
         \u{A0}-i <IGNORE>      Ignore specified commands (e.g. \"ls|grep|nvim\")\n\
         \u{A0}-b <BAR_SIZE>    Size of the bar graph (default: {})\n\
         \u{A0}-n               Do not print the bar\n\
+        \u{A0}-nh              Disable history mode (can be used for any data)\n\
         \u{A0}-np              Do not print the percentage in the bar\n\
         \u{A0}-nc              Do not print the inverse cumulative percentage in the bar\n\
         \u{A0}-v               Verbose\n\
