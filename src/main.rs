@@ -66,7 +66,7 @@ fn main() {
     };
 
     // Calculate total for percentage
-    let total: usize = commands.iter().take(n).map(|(_, &c)| c).sum();
+    let total: usize = commands.iter().take(n).map(|&(_, &c)| c).sum();
 
     // Handle different output formats
     match config.output_format {
