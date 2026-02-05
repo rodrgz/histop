@@ -3,6 +3,7 @@
 //! Analyzes your shell history file and presents the most frequently
 //! used commands in a visually appealing format.
 
+use std::io::{self, BufWriter, Write};
 use std::{cmp, process};
 
 use histop::bar::{BarConfig, BarItem};
@@ -50,13 +51,16 @@ fn main() {
         }
     };
 
-    // Convert to sorted vec
-    let mut commands: Vec<_> = cmd_count
-        .iter()
-        .filter(|&(_, &count)| count > config.more_than)
-        .collect();
+    // Convert to sorted vec with pre-allocated capacity
+    let mut commands: Vec<_> = Vec::with_capacity(cmd_count.len());
+    commands.extend(
+        cmd_count
+            .iter()
+            .filter(|&(_, &count)| count > config.more_than),
+    );
 
-    commands.sort_by_key(|(_, count)| cmp::Reverse(*count));
+    // Use unstable sort for better performance (order of equal elements doesn't matter)
+    commands.sort_unstable_by_key(|(_, count)| cmp::Reverse(*count));
 
     // Limit count
     let n = if config.all {
@@ -87,12 +91,14 @@ fn main() {
             print!("{}", output::format_csv(&entries));
         }
         OutputFormat::Text => {
-            // Create bar items
-            let items: Vec<BarItem> = commands
-                .iter()
-                .take(n)
-                .map(|&(name, &count)| BarItem::new(name, count))
-                .collect();
+            // Create bar items with pre-allocated capacity
+            let mut items: Vec<BarItem> = Vec::with_capacity(n);
+            items.extend(
+                commands
+                    .iter()
+                    .take(n)
+                    .map(|&(name, &count)| BarItem::new(name, count)),
+            );
 
             // Configure and render bars
             let bar_config = BarConfig {
@@ -103,7 +109,12 @@ fn main() {
 
             let colorizer = Colorizer::new(config.color_mode);
             let rendered = bar::render_bars(&items, &bar_config);
-            bar::print_bars(&rendered, !config.no_bar, &colorizer);
+            
+            // Use BufWriter for more efficient output
+            let stdout = io::stdout();
+            let mut writer = BufWriter::new(stdout.lock());
+            bar::write_bars(&mut writer, &rendered, !config.no_bar, &colorizer).unwrap();
+            writer.flush().unwrap();
         }
     }
 }

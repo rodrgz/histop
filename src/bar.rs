@@ -3,6 +3,8 @@
 //! This module can be used for any data with (label, count) pairs,
 //! not just shell history.
 
+use std::io::{self, Write};
+
 use crate::color::{Color, Colorizer};
 
 /// Configuration for bar rendering
@@ -32,6 +34,7 @@ pub struct BarItem<'a> {
 }
 
 impl<'a> BarItem<'a> {
+    #[inline]
     pub fn new(label: &'a str, value: usize) -> Self {
         Self { label, value }
     }
@@ -46,6 +49,7 @@ pub struct RenderedBar {
 }
 
 /// Render a bar segment given percentage values
+#[inline]
 fn render_bar_segment(
     perc: f32,
     inv_cumu_perc: f32,
@@ -81,12 +85,20 @@ fn render_bar_segment(
     }
 
     if unfilled_count + semifilled_count + filled_count > 0 {
-        format!(
-            "│{}{}{}│",
-            "░".repeat(unfilled_count),
-            "▓".repeat(semifilled_count),
-            "█".repeat(filled_count)
-        )
+        // Pre-allocate: 3 bytes for │ chars + characters for bar
+        let mut bar = String::with_capacity(6 + unfilled_count * 3 + semifilled_count * 3 + filled_count * 3);
+        bar.push('│');
+        for _ in 0..unfilled_count {
+            bar.push('░');
+        }
+        for _ in 0..semifilled_count {
+            bar.push('▓');
+        }
+        for _ in 0..filled_count {
+            bar.push('█');
+        }
+        bar.push('│');
+        bar
     } else {
         String::new()
     }
@@ -150,10 +162,15 @@ pub fn render_bars<'a>(
     results
 }
 
-/// Print rendered bars to stdout with proper alignment and optional colors
-pub fn print_bars(bars: &[RenderedBar], show_bar: bool, colorizer: &Colorizer) {
+/// Write rendered bars to a writer with proper alignment and optional colors
+pub fn write_bars<W: Write>(
+    writer: &mut W,
+    bars: &[RenderedBar],
+    show_bar: bool,
+    colorizer: &Colorizer,
+) -> io::Result<()> {
     if bars.is_empty() {
-        return;
+        return Ok(());
     }
 
     // Calculate max percentage width for alignment
@@ -168,10 +185,10 @@ pub fn print_bars(bars: &[RenderedBar], show_bar: bool, colorizer: &Colorizer) {
     for bar in bars {
         // Color the count
         let count_display = colorizer.paint(Color::Cyan, &bar.count_str);
-        print!("{}{}", count_display, padding);
+        write!(writer, "{}{}", count_display, padding)?;
 
         if show_bar && !bar.bar_str.is_empty() {
-            print!("{} ", bar.bar_str);
+            write!(writer, "{} ", bar.bar_str)?;
         }
 
         // Color the percentage
@@ -181,8 +198,17 @@ pub fn print_bars(bars: &[RenderedBar], show_bar: bool, colorizer: &Colorizer) {
         // Color the label
         let label_display = colorizer.paint(Color::BrightWhite, &bar.label);
 
-        println!("{}{}{}", perc_display, padding, label_display);
+        writeln!(writer, "{}{}{}", perc_display, padding, label_display)?;
     }
+    Ok(())
+}
+
+/// Print rendered bars to stdout with proper alignment and optional colors
+/// (convenience wrapper around write_bars)
+pub fn print_bars(bars: &[RenderedBar], show_bar: bool, colorizer: &Colorizer) {
+    let stdout = io::stdout();
+    let mut handle = stdout.lock();
+    let _ = write_bars(&mut handle, bars, show_bar, colorizer);
 }
 
 #[cfg(test)]

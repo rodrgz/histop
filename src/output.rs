@@ -1,5 +1,7 @@
 //! Output formatting module for different output formats.
 
+use std::fmt::Write;
+
 use crate::bar::RenderedBar;
 
 /// Output format for results
@@ -16,12 +18,16 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     /// Parse from string (for CLI argument)
+    #[inline]
     pub fn parse(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "text" => Some(Self::Text),
-            "json" => Some(Self::Json),
-            "csv" => Some(Self::Csv),
-            _ => None,
+        if s.eq_ignore_ascii_case("text") {
+            Some(Self::Text)
+        } else if s.eq_ignore_ascii_case("json") {
+            Some(Self::Json)
+        } else if s.eq_ignore_ascii_case("csv") {
+            Some(Self::Csv)
+        } else {
+            None
         }
     }
 }
@@ -51,7 +57,9 @@ impl CommandEntry {
 
 /// Format output as JSON (no external dependencies)
 pub fn format_json(entries: &[CommandEntry]) -> String {
-    let mut result = String::from("[\n");
+    // Pre-allocate with estimated size (avg ~80 chars per entry)
+    let mut result = String::with_capacity(entries.len() * 80 + 4);
+    result.push_str("[\n");
 
     for (i, entry) in entries.iter().enumerate() {
         // Escape special characters in command
@@ -63,10 +71,11 @@ pub fn format_json(entries: &[CommandEntry]) -> String {
             .replace('\r', "\\r")
             .replace('\t', "\\t");
 
-        result.push_str(&format!(
+        let _ = write!(
+            result,
             "  {{\n    \"command\": \"{}\",\n    \"count\": {},\n    \"percentage\": {:.2}\n  }}",
             escaped_cmd, entry.count, entry.percentage
-        ));
+        );
 
         if i < entries.len() - 1 {
             result.push(',');
@@ -80,7 +89,9 @@ pub fn format_json(entries: &[CommandEntry]) -> String {
 
 /// Format output as CSV
 pub fn format_csv(entries: &[CommandEntry]) -> String {
-    let mut result = String::from("command,count,percentage\n");
+    // Pre-allocate with estimated size (avg ~30 chars per entry + header)
+    let mut result = String::with_capacity(entries.len() * 30 + 30);
+    result.push_str("command,count,percentage\n");
 
     for entry in entries {
         // Escape CSV fields
@@ -88,15 +99,22 @@ pub fn format_csv(entries: &[CommandEntry]) -> String {
             || entry.command.contains('"')
             || entry.command.contains('\n')
         {
-            format!("\"{}\"", entry.command.replace('"', "\"\""))
+            let mut escaped = String::with_capacity(entry.command.len() + 2);
+            escaped.push('"');
+            for c in entry.command.chars() {
+                if c == '"' {
+                    escaped.push_str("\"\"");
+                } else {
+                    escaped.push(c);
+                }
+            }
+            escaped.push('"');
+            escaped
         } else {
             entry.command.clone()
         };
 
-        result.push_str(&format!(
-            "{},{},{:.2}\n",
-            escaped_cmd, entry.count, entry.percentage
-        ));
+        let _ = write!(result, "{},{},{:.2}\n", escaped_cmd, entry.count, entry.percentage);
     }
 
     result

@@ -45,7 +45,7 @@ pub fn count_from_file(
             if !cmd.is_empty() {
                 let first_word = get_first_word(cmd, &ignore_refs, track_subcommands);
                 if !first_word.is_empty() {
-                    *cmd_count.entry(first_word).or_default() += 1;
+                    *cmd_count.entry(first_word.into_owned()).or_default() += 1;
                 }
             }
         }

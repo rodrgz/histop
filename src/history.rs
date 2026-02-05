@@ -53,8 +53,8 @@ pub fn count_from_file(
 
         // Handle zsh extended history format: ": timestamp:0;command"
         let actual_line = if line.starts_with(": ") {
-            if let Some(idx) = line.find(';') {
-                &line[idx + 1..]
+            if let Some((_, cmd)) = line.split_once(';') {
+                cmd
             } else {
                 // Metadata line without command, skip
                 skip = true;
@@ -99,13 +99,13 @@ fn count_commands(
         for subcommand in cleaned_line.split('|') {
             let first_word = get_first_word(subcommand, filtered_commands, track_subcommands);
             if !first_word.is_empty() {
-                *cmd_count.entry(first_word).or_default() += 1;
+                *cmd_count.entry(first_word.into_owned()).or_default() += 1;
             }
         }
     } else {
         let first_word = get_first_word(line, filtered_commands, track_subcommands);
         if !first_word.is_empty() {
-            *cmd_count.entry(first_word).or_default() += 1;
+            *cmd_count.entry(first_word.into_owned()).or_default() += 1;
         }
     }
 }

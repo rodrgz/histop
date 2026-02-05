@@ -1,5 +1,7 @@
 //! Shared utilities for command parsing and processing.
 
+use std::borrow::Cow;
+
 /// Commands that support subcommand tracking.
 /// When subcommand mode is enabled, we track "git status" instead of just "git".
 pub const SUBCOMMAND_TOOLS: &[&str] = &[
@@ -16,11 +18,12 @@ pub const SUBCOMMAND_TOOLS: &[&str] = &[
 ///
 /// # Returns
 /// The first command word (or command + subcommand if tracking)
-pub fn get_first_word(
-    cmd: &str,
+#[inline]
+pub fn get_first_word<'a>(
+    cmd: &'a str,
     filtered: &[&str],
     track_subcommands: bool,
-) -> String {
+) -> Cow<'a, str> {
     let mut words = cmd.split_whitespace().peekable();
 
     while let Some(w) = words.next() {
@@ -50,40 +53,47 @@ pub fn get_first_word(
             if let Some(sub) = words.next() {
                 // Skip flags as subcommands
                 if !sub.starts_with('-') {
-                    return format!("{} {}", word, sub);
+                    // Need to allocate for concatenation
+                    let mut result = String::with_capacity(word.len() + 1 + sub.len());
+                    result.push_str(word);
+                    result.push(' ');
+                    result.push_str(sub);
+                    return Cow::Owned(result);
                 }
             }
         }
-        return word.to_string();
+        return Cow::Borrowed(word);
     }
 
-    String::new()
+    Cow::Borrowed("")
 }
 
 /// Clean a command line by replacing pipes inside quotes with spaces.
 ///
 /// This allows proper splitting of piped commands while preserving
 /// pipes that are part of string arguments.
+#[inline]
 pub fn clean_line(line: &str) -> String {
     let mut in_single_quotes = false;
     let mut in_double_quotes = false;
     let mut cleaned_line = String::with_capacity(line.len());
 
-    for c in line.chars() {
-        match c {
-            '\'' => {
+    // Use bytes() for faster ASCII scanning (quotes and pipes are ASCII)
+    for b in line.bytes() {
+        match b {
+            b'\'' => {
                 in_single_quotes = !in_single_quotes;
-                cleaned_line.push(c);
+                cleaned_line.push(b as char);
             }
-            '\"' => {
+            b'"' => {
                 in_double_quotes = !in_double_quotes;
-                cleaned_line.push(c);
+                cleaned_line.push(b as char);
             }
-            '|' if in_single_quotes || in_double_quotes => {
+            b'|' if in_single_quotes || in_double_quotes => {
                 cleaned_line.push(' ');
             }
             _ => {
-                cleaned_line.push(c);
+                cleaned_line.push(b as char);
             }
         }
     }
