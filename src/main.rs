@@ -60,7 +60,7 @@ fn main() {
     // Convert to sorted vec
     let mut commands: Vec<_> = cmd_count
         .iter()
-        .filter(|(_, &count)| count > config.more_than)
+        .filter(|&(_, &count)| count > config.more_than)
         .collect();
 
     commands.sort_by_key(|(_, count)| cmp::Reverse(*count));
@@ -76,7 +76,7 @@ fn main() {
     let items: Vec<BarItem> = commands
         .iter()
         .take(n)
-        .map(|(name, &count)| BarItem::new(name, count))
+        .map(|&(name, &count)| BarItem::new(name, count))
         .collect();
 
     // Configure and render bars
