@@ -1,6 +1,6 @@
 [package]
 name = "histop"
-version = "0.0.1"
-edition = "2021"
-description = "Show your most frequently used bash/zsh commands in a visually appealing and easy-to-understand format."
+version = "0.1.0"
+edition = "2024"
+description = "Show your most frequently used bash/zsh/fish commands in a visually appealing and easy-to-understand format."
 license = "MIT"
