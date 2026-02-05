@@ -7,9 +7,9 @@ use std::process::Command;
 
 /// Get the path to the histop binary
 fn histop_bin() -> PathBuf {
-    // The binary is in target/debug/histop when running tests
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("target/debug/histop")
+    // CARGO_BIN_EXE_<name> is set by Cargo during integration tests
+    // and points to the correct binary location in any build environment
+    PathBuf::from(env!("CARGO_BIN_EXE_histop"))
 }
 
 /// Get the path to test fixtures
