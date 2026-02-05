@@ -142,3 +142,81 @@ fn get_first_word<'a>(subcommand: &'a str, filtered_commands: &[&str]) -> &'a st
     }
     ""
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_first_word_simple() {
+        let filters = vec!["sudo", "doas"];
+        assert_eq!(get_first_word("ls -la", &filters), "ls");
+    }
+
+    #[test]
+    fn test_get_first_word_with_sudo() {
+        let filters = vec!["sudo", "doas"];
+        assert_eq!(get_first_word("sudo apt update", &filters), "apt");
+    }
+
+    #[test]
+    fn test_get_first_word_with_doas() {
+        let filters = vec!["sudo", "doas"];
+        assert_eq!(get_first_word("doas pacman -S vim", &filters), "pacman");
+    }
+
+    #[test]
+    fn test_get_first_word_env_var_prefix() {
+        let filters = vec![];
+        assert_eq!(get_first_word("FOO=bar cmd arg", &filters), "cmd");
+    }
+
+    #[test]
+    fn test_get_first_word_escaped_command() {
+        let filters = vec![];
+        assert_eq!(get_first_word("\\ls -la", &filters), "ls");
+    }
+
+    #[test]
+    fn test_get_first_word_escaped_filtered() {
+        let filters = vec!["sudo"];
+        assert_eq!(get_first_word("\\sudo apt", &filters), "apt");
+    }
+
+    #[test]
+    fn test_get_first_word_empty() {
+        let filters = vec![];
+        assert_eq!(get_first_word("", &filters), "");
+    }
+
+    #[test]
+    fn test_get_first_word_whitespace_only() {
+        let filters = vec![];
+        assert_eq!(get_first_word("   ", &filters), "");
+    }
+
+    #[test]
+    fn test_clean_line_no_pipe() {
+        let result = clean_line("ls -la");
+        assert_eq!(result, "ls -la");
+    }
+
+    #[test]
+    fn test_clean_line_pipe_outside_quotes() {
+        let result = clean_line("ls | grep foo");
+        assert_eq!(result, "ls | grep foo");
+    }
+
+    #[test]
+    fn test_clean_line_pipe_in_single_quotes() {
+        let result = clean_line("echo 'hello | world'");
+        assert!(!result.contains('|')); // pipe replaced with space
+    }
+
+    #[test]
+    fn test_clean_line_pipe_in_double_quotes() {
+        let result = clean_line(r#"echo "hello | world""#);
+        assert!(!result.contains('|')); // pipe replaced with space
+    }
+}
+

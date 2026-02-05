@@ -5,7 +5,14 @@
   <dt>FreeBSD (x86_64)</dt><dd><a href="https://builds.sr.ht/~rodrgz/histop/commits/main/freebsd.yml"><img src="https://builds.sr.ht/~rodrgz/histop/commits/main/freebsd.yml.svg" alt="Build status for FreeBSD" /></a></dd>
 </dl>
 
-Uncover the hidden gems of your command history! This nifty program analyzes your zsh/bash history file and presents the most frequently used commands in a visually appealing and easy-to-understand format. With powerful options to filter out noise and focus on what matters.
+Uncover the hidden gems of your command history! This nifty program analyzes your shell history file and presents the most frequently used commands in a visually appealing and easy-to-understand format. With powerful options to filter out noise and focus on what matters.
+
+## Supported Shells
+
+- **Bash** (`~/.bash_history`)
+- **Zsh** (`~/.zsh_history` or `~/.config/zsh/.zsh_history`)
+- **Ash** (`~/.ash_history`)
+- **Fish** (`~/.local/share/fish/fish_history`) — native support!
 
 ## Usage
 
@@ -26,10 +33,11 @@ Usage: histop [options]
  -i <IGNORE>      Ignore specified commands (e.g. "ls|grep|nvim")
  -b <BAR_SIZE>    Size of the bar graph (default: 25)
  -n               Do not print the bar
- -nh              Disable history mode (can be used for any data)
+ -nh              Disable history mode (can be used for any data)
  -np              Do not print the percentage in the bar
  -nc              Do not print the inverse cumulative percentage in the bar
  -v               Verbose
+ -F               Force fish history format parsing
  ██               Percentage
  ▓▓               Inverse cumulative percentage
 ```
@@ -50,12 +58,22 @@ $ histop -c 10 -i "cd"
  219   │░░░░░░░░░░░░░░░░░░░░▓▓▓▓█│  3.53%   man
 ```
 
-## How to use in Fish shell
+## Fish Shell
+
+Fish is now natively supported! Just run `histop` from a Fish shell, or use `-f` to point to your fish_history:
+
 ```
-$ history >~/.local/share/fish/history && histop -f ~/.local/share/fish/history
+$ histop -f ~/.local/share/fish/fish_history
+```
+
+For custom YAML-like history files compatible with Fish format, use `-F` to force parsing:
+
+```
+$ histop -F -f /path/to/custom/history
 ```
 
 ## Requirements
 
 1. Rust 1.46 or later
 2. Cargo package manager
+

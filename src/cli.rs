@@ -15,6 +15,7 @@ pub struct Config {
     pub no_cumu: bool,
     pub no_perc: bool,
     pub verbose: bool,
+    pub fish_format: bool,
 }
 
 impl Default for Config {
@@ -31,6 +32,7 @@ impl Default for Config {
             no_cumu: false,
             no_perc: false,
             verbose: false,
+            fish_format: false,
         }
     }
 }
@@ -99,6 +101,9 @@ impl Config {
                 "-v" => {
                     config.verbose = true;
                 }
+                "-F" => {
+                    config.fish_format = true;
+                }
                 _ => {
                     return Err(format!("Invalid option: {}", args[i]));
                 }
@@ -142,31 +147,35 @@ fn get_histfile() -> Result<String, Box<dyn Error>> {
         }
     }
 
+    let home = env::var("HOME").unwrap_or_default();
     let user = env::var("USER").unwrap_or_default();
 
-    let stat_contents = fs::read_to_string("/proc/self/stat").unwrap();
+    let stat_contents = fs::read_to_string("/proc/self/stat")?;
     let fields: Vec<&str> = stat_contents.split_whitespace().collect();
-    let ppid = fields[3];
+    let ppid = fields
+        .get(3)
+        .ok_or("Invalid /proc/self/stat format")?;
 
     let cmdline_file = PathBuf::from(format!("/proc/{}/cmdline", ppid));
-    let cmdline_contents = fs::read_to_string(cmdline_file).unwrap();
+    let cmdline_contents = fs::read_to_string(&cmdline_file)
+        .map_err(|e| format!("Failed to read {}: {}", cmdline_file.display(), e))?;
+
     let parent_cmdline = Path::new(&cmdline_contents)
         .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .trim_end_matches('\0');
+        .and_then(|f| f.to_str())
+        .map(|s| s.trim_end_matches('\0'))
+        .ok_or("Failed to parse parent cmdline")?;
 
     match parent_cmdline {
         "ash" => Ok(format!("/home/{}/.ash_history", user)),
         "bash" => Ok(format!("/home/{}/.bash_history", user)),
         "fish" => {
-            eprintln!(
-                "How to use in Fish Shell\n\
-                history >~/.local/share/fish/history && \
-                histop -f ~/.local/share/fish/history"
-            );
-            process::exit(1);
+            let histfile = format!("{}/.local/share/fish/fish_history", home);
+            if fs::metadata(&histfile).is_ok() {
+                Ok(histfile)
+            } else {
+                Err(format!("Fish history not found at {}", histfile).into())
+            }
         }
         "zsh" => {
             let histfile = format!("/home/{}/.config/zsh/.zsh_history", user);
@@ -181,7 +190,7 @@ fn get_histfile() -> Result<String, Box<dyn Error>> {
             }
         }
         _ => {
-            eprintln!("Unknown shell");
+            eprintln!("Unknown shell: {}", parent_cmdline);
             Err("Unknown shell".into())
         }
     }
@@ -202,6 +211,7 @@ fn print_help_message(count: usize, bar_size: usize) {
         \u{A0}-np              Do not print the percentage in the bar\n\
         \u{A0}-nc              Do not print the inverse cumulative percentage in the bar\n\
         \u{A0}-v               Verbose\n\
+        \u{A0}-F               Force fish history format parsing\n\
         \u{A0}██               Percentage\n\
         \u{A0}▓▓               Inverse cumulative percentage",
         count, bar_size
