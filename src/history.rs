@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 
+use crate::utils::{clean_line, get_first_word};
+
 /// Count commands from a history file
 ///
 /// Returns a HashMap of command -> count
@@ -11,6 +13,7 @@ pub fn count_from_file(
     file_path: &str,
     ignore: &[String],
     no_hist: bool,
+    track_subcommands: bool,
     verbose: bool,
 ) -> Result<HashMap<String, usize>, std::io::Error> {
     let file = fs::File::open(file_path)?;
@@ -48,12 +51,25 @@ pub fn count_from_file(
             }
         };
 
-        match (skip, line.starts_with(": "), line.ends_with("\\")) {
+        // Handle zsh extended history format: ": timestamp:0;command"
+        let actual_line = if line.starts_with(": ") {
+            if let Some(idx) = line.find(';') {
+                &line[idx + 1..]
+            } else {
+                // Metadata line without command, skip
+                skip = true;
+                continue;
+            }
+        } else {
+            line.as_str()
+        };
+
+        match (skip, line.starts_with(": ") && !line.contains(';'), line.ends_with("\\")) {
             (false, false, false) => {
-                count_commands(&mut cmd_count, &line, &filtered_commands, no_hist);
+                count_commands(&mut cmd_count, actual_line, &filtered_commands, no_hist, track_subcommands);
             }
             (false, false, true) => {
-                count_commands(&mut cmd_count, &line, &filtered_commands, no_hist);
+                count_commands(&mut cmd_count, actual_line, &filtered_commands, no_hist, track_subcommands);
                 skip = true;
             }
             (false, true, _) => {
@@ -76,71 +92,22 @@ fn count_commands(
     line: &str,
     filtered_commands: &[&str],
     no_hist: bool,
+    track_subcommands: bool,
 ) {
     if line.contains("|") && !no_hist {
         let cleaned_line = clean_line(line);
         for subcommand in cleaned_line.split('|') {
-            let first_word = get_first_word(subcommand, filtered_commands);
+            let first_word = get_first_word(subcommand, filtered_commands, track_subcommands);
             if !first_word.is_empty() {
-                cmd_count
-                    .entry(first_word.to_string())
-                    .and_modify(|count| *count += 1)
-                    .or_default();
+                *cmd_count.entry(first_word).or_default() += 1;
             }
         }
     } else {
-        let first_word = get_first_word(line, filtered_commands);
+        let first_word = get_first_word(line, filtered_commands, track_subcommands);
         if !first_word.is_empty() {
-            cmd_count
-                .entry(first_word.to_string())
-                .and_modify(|count| *count += 1)
-                .or_default();
+            *cmd_count.entry(first_word).or_default() += 1;
         }
     }
-}
-
-fn clean_line(line: &str) -> String {
-    let mut in_single_quotes = false;
-    let mut in_double_quotes = false;
-    let mut cleaned_line = String::with_capacity(line.len());
-
-    for c in line.chars() {
-        match c {
-            '\'' => {
-                in_single_quotes = !in_single_quotes;
-                cleaned_line.push(c);
-            }
-            '\"' => {
-                in_double_quotes = !in_double_quotes;
-                cleaned_line.push(c);
-            }
-            '|' if in_single_quotes || in_double_quotes => {
-                cleaned_line.push(' ');
-            }
-            _ => {
-                cleaned_line.push(c);
-            }
-        }
-    }
-
-    cleaned_line
-}
-
-fn get_first_word<'a>(subcommand: &'a str, filtered_commands: &[&str]) -> &'a str {
-    for w in subcommand.trim().split_whitespace() {
-        if filtered_commands.contains(&w) || w.contains('=') {
-            continue;
-        } else if w.starts_with('\\') && w.len() > 1 {
-            if filtered_commands.contains(&&w[1..]) {
-                continue;
-            } else {
-                return &w[1..];
-            }
-        } else {
-            return w;
-        }
-    }
-    ""
 }
 
 #[cfg(test)]
@@ -148,75 +115,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_first_word_simple() {
+    fn test_count_commands_simple() {
+        let mut cmd_count = HashMap::new();
         let filters = vec!["sudo", "doas"];
-        assert_eq!(get_first_word("ls -la", &filters), "ls");
+        count_commands(&mut cmd_count, "ls -la", &filters, false, false);
+        assert_eq!(cmd_count.get("ls"), Some(&1));
     }
 
     #[test]
-    fn test_get_first_word_with_sudo() {
+    fn test_count_commands_with_pipe() {
+        let mut cmd_count = HashMap::new();
         let filters = vec!["sudo", "doas"];
-        assert_eq!(get_first_word("sudo apt update", &filters), "apt");
+        count_commands(&mut cmd_count, "ls | grep foo", &filters, false, false);
+        assert_eq!(cmd_count.get("ls"), Some(&1));
+        assert_eq!(cmd_count.get("grep"), Some(&1));
     }
 
     #[test]
-    fn test_get_first_word_with_doas() {
-        let filters = vec!["sudo", "doas"];
-        assert_eq!(get_first_word("doas pacman -S vim", &filters), "pacman");
-    }
-
-    #[test]
-    fn test_get_first_word_env_var_prefix() {
-        let filters = vec![];
-        assert_eq!(get_first_word("FOO=bar cmd arg", &filters), "cmd");
-    }
-
-    #[test]
-    fn test_get_first_word_escaped_command() {
-        let filters = vec![];
-        assert_eq!(get_first_word("\\ls -la", &filters), "ls");
-    }
-
-    #[test]
-    fn test_get_first_word_escaped_filtered() {
-        let filters = vec!["sudo"];
-        assert_eq!(get_first_word("\\sudo apt", &filters), "apt");
-    }
-
-    #[test]
-    fn test_get_first_word_empty() {
-        let filters = vec![];
-        assert_eq!(get_first_word("", &filters), "");
-    }
-
-    #[test]
-    fn test_get_first_word_whitespace_only() {
-        let filters = vec![];
-        assert_eq!(get_first_word("   ", &filters), "");
-    }
-
-    #[test]
-    fn test_clean_line_no_pipe() {
-        let result = clean_line("ls -la");
-        assert_eq!(result, "ls -la");
-    }
-
-    #[test]
-    fn test_clean_line_pipe_outside_quotes() {
-        let result = clean_line("ls | grep foo");
-        assert_eq!(result, "ls | grep foo");
-    }
-
-    #[test]
-    fn test_clean_line_pipe_in_single_quotes() {
-        let result = clean_line("echo 'hello | world'");
-        assert!(!result.contains('|')); // pipe replaced with space
-    }
-
-    #[test]
-    fn test_clean_line_pipe_in_double_quotes() {
-        let result = clean_line(r#"echo "hello | world""#);
-        assert!(!result.contains('|')); // pipe replaced with space
+    fn test_count_commands_with_subcommands() {
+        let mut cmd_count = HashMap::new();
+        let filters: Vec<&str> = vec![];
+        count_commands(&mut cmd_count, "git status", &filters, false, true);
+        assert_eq!(cmd_count.get("git status"), Some(&1));
     }
 }
-

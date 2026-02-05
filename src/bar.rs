@@ -3,6 +3,8 @@
 //! This module can be used for any data with (label, count) pairs,
 //! not just shell history.
 
+use crate::color::{Color, Colorizer};
+
 /// Configuration for bar rendering
 pub struct BarConfig {
     /// Width of the bar in characters
@@ -148,8 +150,8 @@ pub fn render_bars<'a>(
     results
 }
 
-/// Print rendered bars to stdout with proper alignment
-pub fn print_bars(bars: &[RenderedBar], show_bar: bool) {
+/// Print rendered bars to stdout with proper alignment and optional colors
+pub fn print_bars(bars: &[RenderedBar], show_bar: bool, colorizer: &Colorizer) {
     if bars.is_empty() {
         return;
     }
@@ -164,18 +166,68 @@ pub fn print_bars(bars: &[RenderedBar], show_bar: bool) {
     let padding = "   ";
 
     for bar in bars {
-        print!("{}{}", bar.count_str, padding);
+        // Color the count
+        let count_display = colorizer.paint(Color::Cyan, &bar.count_str);
+        print!("{}{}", count_display, padding);
 
         if show_bar && !bar.bar_str.is_empty() {
             print!("{} ", bar.bar_str);
         }
 
-        println!(
-            "{:>width$}{}{}",
-            bar.percentage_str,
-            padding,
-            bar.label,
-            width = max_perc_width
-        );
+        // Color the percentage
+        let perc_formatted = format!("{:>width$}", bar.percentage_str, width = max_perc_width);
+        let perc_display = colorizer.paint(Color::Yellow, &perc_formatted);
+
+        // Color the label
+        let label_display = colorizer.paint(Color::BrightWhite, &bar.label);
+
+        println!("{}{}{}", perc_display, padding, label_display);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::color::ColorMode;
+
+    #[test]
+    fn test_render_bars_empty() {
+        let items: Vec<BarItem> = vec![];
+        let config = BarConfig::default();
+        let result = render_bars(&items, &config);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_render_bars_single() {
+        let items = vec![BarItem::new("ls", 10)];
+        let config = BarConfig::default();
+        let result = render_bars(&items, &config);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].label, "ls");
+        assert_eq!(result[0].percentage_str, "100.00%");
+    }
+
+    #[test]
+    fn test_render_bars_multiple() {
+        let items = vec![
+            BarItem::new("ls", 50),
+            BarItem::new("git", 30),
+            BarItem::new("cd", 20),
+        ];
+        let config = BarConfig::default();
+        let result = render_bars(&items, &config);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].percentage_str, "50.00%");
+    }
+
+    #[test]
+    fn test_print_bars_no_crash() {
+        let items = vec![BarItem::new("test", 5)];
+        let config = BarConfig::default();
+        let bars = render_bars(&items, &config);
+        let colorizer = Colorizer::new(ColorMode::Never);
+        // Just verify it doesn't crash
+        print_bars(&bars, true, &colorizer);
     }
 }

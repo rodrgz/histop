@@ -1,0 +1,21 @@
+ls -la
+git status
+nvim src/main.rs
+cargo build
+ls
+git commit -m "test"
+sudo apt update
+cd /home/user
+ls | grep foo
+git push origin main
+cargo test
+nvim README.md
+ls -la
+git log
+cargo build --release
+exit
+nvim config.toml
+git diff
+ls
+git status
+cargo run
