@@ -72,6 +72,39 @@ For custom YAML-like history files compatible with Fish format, use `-F` to forc
 $ histop -F -f /path/to/custom/history
 ```
 
+## Testing
+
+### Running All Tests
+
+```bash
+cargo test
+```
+
+This runs all tests:
+- **Unit tests** (38 tests) — test individual functions in each module
+- **Integration tests** (14 tests) — test history parsing with fixture files
+- **CLI tests** (42 tests) — test all command-line options end-to-end
+
+### Running Specific Test Suites
+
+```bash
+# Unit tests only (in src/)
+cargo test --lib
+
+# Integration tests only
+cargo test --test integration_test
+
+# CLI tests only (requires binary to be built first)
+cargo build && cargo test --test cli_test
+```
+
+### Test Fixtures
+
+Test fixtures are located in `tests/fixtures/`:
+- `bash_history` — sample bash history file
+- `zsh_history` — sample zsh extended history file  
+- `fish_history` — sample fish history file (YAML format)
+
 ## Requirements
 
 1. Rust 1.46 or later
