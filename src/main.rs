@@ -2,9 +2,22 @@
 //!
 //! Analyzes your shell history file and presents the most frequently
 //! used commands in a visually appealing format.
+//!
+//! ## Supported Shells
+//! - Bash (`~/.bash_history`)
+//! - Zsh (`~/.zsh_history` or `~/.config/zsh/.zsh_history`)
+//! - Ash (`~/.ash_history`)
+//! - Fish (`~/.local/share/fish/fish_history`) — native support
+//!
+//! ## Features
+//! - Automatic shell detection via `/proc/self/stat`
+//! - Smart filtering of `sudo`/`doas` prefixes
+//! - Pipeline command parsing
+//! - Visual bar graphs with percentage indicators
 
 mod bar;
 mod cli;
+mod fish;
 mod history;
 
 use std::{cmp, process};
@@ -21,16 +34,26 @@ fn main() {
         }
     };
 
-    let cmd_count = match history::count_from_file(
-        &config.file,
-        &config.ignore,
-        config.no_hist,
-        config.verbose,
-    ) {
-        Ok(counts) => counts,
-        Err(e) => {
-            eprintln!("Error reading history file: {}", e);
-            process::exit(1);
+    let cmd_count = if config.fish_format || is_fish_history(&config.file) {
+        match fish::count_from_file(&config.file, &config.ignore, config.verbose) {
+            Ok(counts) => counts,
+            Err(e) => {
+                eprintln!("Error reading fish history file: {}", e);
+                process::exit(1);
+            }
+        }
+    } else {
+        match history::count_from_file(
+            &config.file,
+            &config.ignore,
+            config.no_hist,
+            config.verbose,
+        ) {
+            Ok(counts) => counts,
+            Err(e) => {
+                eprintln!("Error reading history file: {}", e);
+                process::exit(1);
+            }
         }
     };
 
@@ -65,4 +88,9 @@ fn main() {
 
     let rendered = bar::render_bars(&items, &bar_config);
     bar::print_bars(&rendered, !config.no_bar);
+}
+
+/// Check if a file path is a fish history file
+fn is_fish_history(path: &str) -> bool {
+    path.ends_with("fish_history") || path.contains("/fish/")
 }
