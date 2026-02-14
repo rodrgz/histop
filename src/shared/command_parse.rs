@@ -59,37 +59,53 @@ pub fn get_first_word<'a>(cmd: &'a str, filtered: &[&str]) -> Option<&'a str> {
     None
 }
 
-/// Clean a command line by replacing pipes inside quotes with spaces.
+/// Iterator that splits a command line by pipes `|`, respecting quotes.
 ///
-/// This allows proper splitting of piped commands while preserving
-/// pipes that are part of string arguments.
-#[inline]
-pub fn clean_line(line: &str) -> String {
-    let mut in_single_quotes = false;
-    let mut in_double_quotes = false;
-    let mut cleaned_line = String::with_capacity(line.len());
+/// This avoids allocating a new String just to mask pipes inside quotes.
+pub struct SplitCommands<'a> {
+    remaining: &'a str,
+}
 
-    // Use bytes() for faster ASCII scanning (quotes and pipes are ASCII)
-    for b in line.bytes() {
-        match b {
-            b'\'' => {
-                in_single_quotes = !in_single_quotes;
-                cleaned_line.push(b as char);
-            }
-            b'"' => {
-                in_double_quotes = !in_double_quotes;
-                cleaned_line.push(b as char);
-            }
-            b'|' if in_single_quotes || in_double_quotes => {
-                cleaned_line.push(' ');
-            }
-            _ => {
-                cleaned_line.push(b as char);
+impl<'a> SplitCommands<'a> {
+    pub fn new(line: &'a str) -> Self {
+        Self { remaining: line }
+    }
+}
+
+impl<'a> Iterator for SplitCommands<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining.is_empty() {
+            return None;
+        }
+
+        let mut in_single_quotes = false;
+        let mut in_double_quotes = false;
+        let mut split_idx = None;
+
+        for (i, b) in self.remaining.bytes().enumerate() {
+            match b {
+                b'\'' => in_single_quotes = !in_single_quotes,
+                b'"' => in_double_quotes = !in_double_quotes,
+                b'|' if !in_single_quotes && !in_double_quotes => {
+                    split_idx = Some(i);
+                    break;
+                }
+                _ => {}
             }
         }
-    }
 
-    cleaned_line
+        if let Some(idx) = split_idx {
+            let (chunk, rest) = self.remaining.split_at(idx);
+            self.remaining = &rest[1..]; // Skip the pipe
+            Some(chunk)
+        } else {
+            let chunk = self.remaining;
+            self.remaining = "";
+            Some(chunk)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -157,26 +173,32 @@ mod tests {
     }
 
     #[test]
-    fn test_clean_line_no_pipe() {
-        let result = clean_line("ls -la");
-        assert_eq!(result, "ls -la");
+    fn test_split_commands_no_pipe() {
+        let parts: Vec<&str> = SplitCommands::new("ls -la").collect();
+        assert_eq!(parts, vec!["ls -la"]);
     }
 
     #[test]
-    fn test_clean_line_pipe_outside_quotes() {
-        let result = clean_line("ls | grep foo");
-        assert_eq!(result, "ls | grep foo");
+    fn test_split_commands_pipe_outside_quotes() {
+        let parts: Vec<&str> = SplitCommands::new("ls | grep foo").collect();
+        assert_eq!(parts, vec!["ls ", " grep foo"]);
     }
 
     #[test]
-    fn test_clean_line_pipe_in_single_quotes() {
-        let result = clean_line("echo 'hello | world'");
-        assert!(!result.contains('|'));
+    fn test_split_commands_pipe_in_single_quotes() {
+        let parts: Vec<&str> = SplitCommands::new("echo 'hello | world'").collect();
+        assert_eq!(parts, vec!["echo 'hello | world'"]);
     }
 
     #[test]
-    fn test_clean_line_pipe_in_double_quotes() {
-        let result = clean_line(r#"echo "hello | world""#);
-        assert!(!result.contains('|'));
+    fn test_split_commands_pipe_in_double_quotes() {
+        let parts: Vec<&str> = SplitCommands::new(r#"echo "hello | world""#).collect();
+        assert_eq!(parts, vec![r#"echo "hello | world""#]);
+    }
+
+    #[test]
+    fn test_split_commands_mixed() {
+        let parts: Vec<&str> = SplitCommands::new("echo 'foo | bar' | grep baz").collect();
+        assert_eq!(parts, vec!["echo 'foo | bar' ", " grep baz"]);
     }
 }

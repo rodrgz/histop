@@ -158,7 +158,7 @@ ignore = ["ls", "cd"]
 }
 
 mod utils {
-    use histop::shared::command_parse::{clean_line, get_first_word};
+    use histop::shared::command_parse::{get_first_word, SplitCommands};
 
     #[test]
     fn test_get_first_word() {
@@ -167,8 +167,8 @@ mod utils {
     }
 
     #[test]
-    fn test_clean_line_preserves_outer_pipes() {
-        let result = clean_line("cat file | grep pattern | wc -l");
-        assert_eq!(result, "cat file | grep pattern | wc -l");
+    fn test_split_commands_splits_on_pipes() {
+        let parts: Vec<&str> = SplitCommands::new("cat file | grep pattern | wc -l").collect();
+        assert_eq!(parts, vec!["cat file ", " grep pattern ", " wc -l"]);
     }
 }

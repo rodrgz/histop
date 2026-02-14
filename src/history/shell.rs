@@ -4,7 +4,7 @@ use ahash::AHashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 
-use crate::shared::command_parse::{clean_line, get_first_word};
+use crate::shared::command_parse::{get_first_word, SplitCommands};
 
 /// Count commands from a history file
 ///
@@ -140,19 +140,10 @@ fn count_commands(
     filtered_commands: &[&str],
     no_hist: bool,
 ) {
-    if line.contains("|") && !no_hist {
-        if line.contains('\'') || line.contains('"') {
-            let cleaned_line = clean_line(line);
-            for subcommand in cleaned_line.split('|') {
-                if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
-                    increment_count(cmd_count, first_word);
-                }
-            }
-        } else {
-            for subcommand in line.split('|') {
-                if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
-                    increment_count(cmd_count, first_word);
-                }
+    if line.contains('|') && !no_hist {
+        for subcommand in SplitCommands::new(line) {
+            if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
+                increment_count(cmd_count, first_word);
             }
         }
     } else {

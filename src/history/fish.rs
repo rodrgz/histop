@@ -12,7 +12,7 @@ use ahash::AHashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 
-use crate::shared::command_parse::{clean_line, get_first_word};
+use crate::shared::command_parse::{get_first_word, SplitCommands};
 
 /// Parse fish_history file and count commands
 ///
@@ -175,18 +175,9 @@ fn count_commands(
     no_hist: bool,
 ) {
     if line.contains('|') && !no_hist {
-        if line.contains('\'') || line.contains('"') {
-            let cleaned_line = clean_line(line);
-            for subcommand in cleaned_line.split('|') {
-                if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
-                    increment_count(cmd_count, first_word);
-                }
-            }
-        } else {
-            for subcommand in line.split('|') {
-                if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
-                    increment_count(cmd_count, first_word);
-                }
+        for subcommand in SplitCommands::new(line) {
+            if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
+                increment_count(cmd_count, first_word);
             }
         }
     } else if let Some(first_word) = get_first_word(line, filtered_commands) {
