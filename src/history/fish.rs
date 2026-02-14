@@ -22,13 +22,15 @@ use crate::shared::command_parse::{clean_line, get_first_word};
 ///
 /// # Returns
 /// A HashMap of command -> count
+const MAX_IN_MEMORY_SIZE: u64 = 100 * 1024 * 1024; // 100MB
+
+/// Parse fish_history file and count commands
 pub fn count_from_file(
     file_path: &str,
     ignore: &[String],
     no_hist: bool,
 ) -> Result<HashMap<String, usize>, std::io::Error> {
-    let file = fs::File::open(file_path)?;
-    let mut reader = BufReader::new(file);
+    let metadata = fs::metadata(file_path)?;
     let mut cmd_count: HashMap<String, usize> = HashMap::with_capacity(256);
 
     let mut filtered_commands: Vec<&str> = Vec::with_capacity(ignore.len() + 2);
@@ -37,8 +39,55 @@ pub fn count_from_file(
     }
     let ignore_refs: Vec<&str> = ignore.iter().map(|s| s.as_str()).collect();
     filtered_commands.extend(ignore_refs);
-    let mut line_buf: Vec<u8> = Vec::with_capacity(256);
-    let mut current_cmd: Option<String> = None;
+
+    if metadata.len() < MAX_IN_MEMORY_SIZE {
+        let bytes = fs::read(file_path)?;
+        count_from_bytes(&bytes, &mut cmd_count, &filtered_commands, no_hist);
+    } else {
+        let file = fs::File::open(file_path)?;
+        let reader = BufReader::new(file);
+        count_from_reader(reader, &mut cmd_count, &filtered_commands, no_hist)?;
+    }
+
+    Ok(cmd_count)
+}
+
+fn count_from_bytes(
+    bytes: &[u8],
+    cmd_count: &mut HashMap<String, usize>,
+    filtered_commands: &[&str],
+    no_hist: bool,
+) {
+    let mut current_cmd = String::with_capacity(256);
+
+    for line_bytes in bytes.split(|&b| b == b'\n') {
+        let line = match std::str::from_utf8(line_bytes) {
+            Ok(s) => trim_line_end(s),
+            Err(_) => continue,
+        };
+
+        process_line(
+            line,
+            &mut current_cmd,
+            cmd_count,
+            filtered_commands,
+            no_hist,
+        );
+    }
+
+    if !current_cmd.is_empty() {
+        count_commands(cmd_count, &current_cmd, filtered_commands, no_hist);
+    }
+}
+
+fn count_from_reader<R: BufRead>(
+    mut reader: R,
+    cmd_count: &mut HashMap<String, usize>,
+    filtered_commands: &[&str],
+    no_hist: bool,
+) -> std::io::Result<()> {
+    let mut current_cmd = String::with_capacity(256);
+    let mut line_buf = Vec::with_capacity(256);
 
     loop {
         line_buf.clear();
@@ -48,50 +97,70 @@ pub fn count_from_file(
         }
 
         let line = match std::str::from_utf8(&line_buf) {
-            Ok(line) => trim_line_end(line),
+            Ok(s) => trim_line_end(s),
             Err(_) => continue,
         };
 
-        // Fish history command lines start with "- cmd: "
-        if let Some(cmd) = line.strip_prefix("- cmd: ") {
-            if let Some(existing_cmd) = current_cmd.take() {
-                count_commands(&mut cmd_count, &existing_cmd, &filtered_commands, no_hist);
-            }
-            current_cmd = Some(cmd.to_string());
-            continue;
-        }
+        process_line(
+            line,
+            &mut current_cmd,
+            cmd_count,
+            filtered_commands,
+            no_hist,
+        );
+    }
 
-        if let Some(cmd) = current_cmd.as_mut() {
-            // Multiline fish command continuation:
-            // - cmd: doas -- \
-            //   systemctl stop sshd
-            if cmd.ends_with('\\')
-                && line.starts_with("  ")
-                && !line.starts_with("  when: ")
-                && !line.starts_with("  paths:")
-                && !line.starts_with("  - ")
-            {
-                cmd.pop();
-                *cmd = cmd.trim_end().to_string();
-                cmd.push(' ');
-                cmd.push_str(line.trim_start());
-                continue;
-            }
+    if !current_cmd.is_empty() {
+        count_commands(cmd_count, &current_cmd, filtered_commands, no_hist);
+    }
+
+    Ok(())
+}
+
+fn process_line(
+    trimmed_line: &str,
+    current_cmd: &mut String,
+    cmd_count: &mut HashMap<String, usize>,
+    filtered_commands: &[&str],
+    no_hist: bool,
+) {
+    // Fish history command lines start with "- cmd: "
+    if let Some(cmd) = trimmed_line.strip_prefix("- cmd: ") {
+        if !current_cmd.is_empty() {
+            count_commands(cmd_count, current_cmd, filtered_commands, no_hist);
+        }
+        current_cmd.clear();
+        current_cmd.push_str(cmd);
+        return;
+    }
+
+    if !current_cmd.is_empty() {
+        // Multiline fish command continuation:
+        // - cmd: doas -- \
+        //   systemctl stop sshd
+        if current_cmd.ends_with('\\')
+            && trimmed_line.starts_with("  ")
+            && !trimmed_line.starts_with("  when: ")
+            && !trimmed_line.starts_with("  paths:")
+            && !trimmed_line.starts_with("  - ")
+        {
+            current_cmd.pop();
+            let len = current_cmd.trim_end().len();
+            current_cmd.truncate(len);
+            current_cmd.push(' ');
+            current_cmd.push_str(trimmed_line.trim_start());
+            return;
         }
 
         // Metadata ends the current command entry
-        if line.starts_with("  when: ") || line.starts_with("  paths:") || line.starts_with("  - ") {
-            if let Some(existing_cmd) = current_cmd.take() {
-                count_commands(&mut cmd_count, &existing_cmd, &filtered_commands, no_hist);
-            }
+        if trimmed_line.starts_with("  when: ")
+            || trimmed_line.starts_with("  paths:")
+            || trimmed_line.starts_with("  - ")
+        {
+            count_commands(cmd_count, current_cmd, filtered_commands, no_hist);
+            current_cmd.clear();
         }
     }
-
-    if let Some(existing_cmd) = current_cmd.take() {
-        count_commands(&mut cmd_count, &existing_cmd, &filtered_commands, no_hist);
-    }
-
-    Ok(cmd_count)
 }
 
 #[inline]

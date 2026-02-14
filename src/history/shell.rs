@@ -9,26 +9,62 @@ use crate::shared::command_parse::{clean_line, get_first_word};
 /// Count commands from a history file
 ///
 /// Returns a HashMap of command -> count
+const MAX_IN_MEMORY_SIZE: u64 = 100 * 1024 * 1024; // 100MB
+
+/// Count commands from a history file
 pub fn count_from_file(
     file_path: &str,
     ignore: &[String],
     no_hist: bool,
 ) -> Result<HashMap<String, usize>, std::io::Error> {
-    let file = fs::File::open(file_path)?;
-    let mut reader = BufReader::new(file);
+    let metadata = fs::metadata(file_path)?;
+    let mut cmd_count: HashMap<String, usize> = HashMap::with_capacity(256);
 
     let mut filtered_commands: Vec<&str> = Vec::with_capacity(ignore.len() + 2);
     if !no_hist {
         filtered_commands.extend(["sudo", "doas"]);
     }
-
-    // Add user-specified ignore commands
     let ignore_refs: Vec<&str> = ignore.iter().map(|s| s.as_str()).collect();
     filtered_commands.extend(ignore_refs);
 
+    if metadata.len() < MAX_IN_MEMORY_SIZE {
+        let bytes = fs::read(file_path)?;
+        count_from_bytes(&bytes, &mut cmd_count, &filtered_commands, no_hist);
+    } else {
+        let file = fs::File::open(file_path)?;
+        let reader = BufReader::new(file);
+        count_from_reader(reader, &mut cmd_count, &filtered_commands, no_hist)?;
+    }
+
+    Ok(cmd_count)
+}
+
+fn count_from_bytes(
+    bytes: &[u8],
+    cmd_count: &mut HashMap<String, usize>,
+    filtered_commands: &[&str],
+    no_hist: bool,
+) {
     let mut skip = false;
-    let mut cmd_count: HashMap<String, usize> = HashMap::with_capacity(256);
-    let mut line_buf: Vec<u8> = Vec::with_capacity(256);
+
+    for line_bytes in bytes.split(|&b| b == b'\n') {
+        let line = match std::str::from_utf8(line_bytes) {
+            Ok(s) => trim_line_end(s),
+            Err(_) => continue,
+        };
+
+        process_line(line, &mut skip, cmd_count, filtered_commands, no_hist);
+    }
+}
+
+fn count_from_reader<R: BufRead>(
+    mut reader: R,
+    cmd_count: &mut HashMap<String, usize>,
+    filtered_commands: &[&str],
+    no_hist: bool,
+) -> std::io::Result<()> {
+    let mut skip = false;
+    let mut line_buf = Vec::with_capacity(256);
 
     loop {
         line_buf.clear();
@@ -38,45 +74,59 @@ pub fn count_from_file(
         }
 
         let line = match std::str::from_utf8(&line_buf) {
-            Ok(line) => trim_line_end(line),
+            Ok(s) => trim_line_end(s),
             Err(_) => continue,
         };
 
-        // Handle zsh extended history format: ": timestamp:0;command"
-        let is_zsh_extended = line.starts_with(": ");
-        let actual_line = if is_zsh_extended {
-            if let Some((_, cmd)) = line.split_once(';') {
-                cmd
-            } else {
-                // Metadata line without command, skip
-                skip = true;
-                continue;
-            }
-        } else {
-            line
-        };
-
-        match (skip, is_zsh_extended && !line.contains(';'), actual_line.ends_with('\\')) {
-            (false, false, false) => {
-                count_commands(&mut cmd_count, actual_line, &filtered_commands, no_hist);
-            }
-            (false, false, true) => {
-                count_commands(&mut cmd_count, actual_line, &filtered_commands, no_hist);
-                skip = true;
-            }
-            (false, true, _) => {
-                skip = true;
-            }
-            (true, _, true) => {
-                skip = true;
-            }
-            (true, _, false) => {
-                skip = false;
-            }
-        }
+        process_line(line, &mut skip, cmd_count, filtered_commands, no_hist);
     }
 
-    Ok(cmd_count)
+    Ok(())
+}
+
+fn process_line(
+    trimmed_line: &str,
+    skip: &mut bool,
+    cmd_count: &mut HashMap<String, usize>,
+    filtered_commands: &[&str],
+    no_hist: bool,
+) {
+    // Handle zsh extended history format: ": timestamp:0;command"
+    let is_zsh_extended = trimmed_line.starts_with(": ");
+    let actual_line = if is_zsh_extended {
+        if let Some((_, cmd)) = trimmed_line.split_once(';') {
+            cmd
+        } else {
+            // Metadata line without command, skip
+            *skip = true;
+            return;
+        }
+    } else {
+        trimmed_line
+    };
+
+    match (
+        *skip,
+        is_zsh_extended && !trimmed_line.contains(';'),
+        actual_line.ends_with('\\'),
+    ) {
+        (false, false, false) => {
+            count_commands(cmd_count, actual_line, filtered_commands, no_hist);
+        }
+        (false, false, true) => {
+            count_commands(cmd_count, actual_line, filtered_commands, no_hist);
+            *skip = true;
+        }
+        (false, true, _) => {
+            *skip = true;
+        }
+        (true, _, true) => {
+            *skip = true;
+        }
+        (true, _, false) => {
+            *skip = false;
+        }
+    }
 }
 
 #[inline]
