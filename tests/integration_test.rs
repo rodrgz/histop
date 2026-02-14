@@ -17,8 +17,6 @@ mod bash_history {
             path.to_str().unwrap(),
             &[],
             false,
-            false,
-            false,
         )
         .unwrap();
 
@@ -32,32 +30,12 @@ mod bash_history {
     }
 
     #[test]
-    fn test_bash_with_subcommands() {
-        let path = fixtures_path().join("bash_history");
-        let result = histop::history::count_from_file(
-            path.to_str().unwrap(),
-            &[],
-            false,
-            true, // track subcommands
-            false,
-        )
-        .unwrap();
-
-        // With subcommand tracking
-        assert_eq!(result.get("git status"), Some(&2));
-        assert_eq!(result.get("git commit"), Some(&1));
-        assert_eq!(result.get("cargo build"), Some(&2));
-    }
-
-    #[test]
     fn test_bash_with_ignore() {
         let path = fixtures_path().join("bash_history");
         let ignore = vec!["ls".to_string(), "cd".to_string()];
         let result = histop::history::count_from_file(
             path.to_str().unwrap(),
             &ignore,
-            false,
-            false,
             false,
         )
         .unwrap();
@@ -80,8 +58,6 @@ mod zsh_history {
             path.to_str().unwrap(),
             &[],
             false,
-            false,
-            false,
         )
         .unwrap();
 
@@ -91,21 +67,6 @@ mod zsh_history {
         assert_eq!(result.get("cargo"), Some(&4));
     }
 
-    #[test]
-    fn test_zsh_with_subcommands() {
-        let path = fixtures_path().join("zsh_history");
-        let result = histop::history::count_from_file(
-            path.to_str().unwrap(),
-            &[],
-            false,
-            true,
-            false,
-        )
-        .unwrap();
-
-        assert_eq!(result.get("git status"), Some(&2));
-        assert_eq!(result.get("cargo build"), Some(&2));
-    }
 }
 
 mod fish_history {
@@ -117,8 +78,6 @@ mod fish_history {
         let result = histop::fish::count_from_file(
             path.to_str().unwrap(),
             &[],
-            false,
-            false,
         )
         .unwrap();
 
@@ -130,29 +89,12 @@ mod fish_history {
     }
 
     #[test]
-    fn test_fish_with_subcommands() {
-        let path = fixtures_path().join("fish_history");
-        let result = histop::fish::count_from_file(
-            path.to_str().unwrap(),
-            &[],
-            true,
-            false,
-        )
-        .unwrap();
-
-        assert_eq!(result.get("git status"), Some(&2));
-        assert_eq!(result.get("git commit"), Some(&1));
-    }
-
-    #[test]
     fn test_fish_with_ignore() {
         let path = fixtures_path().join("fish_history");
         let ignore = vec!["ls".to_string()];
         let result = histop::fish::count_from_file(
             path.to_str().unwrap(),
             &ignore,
-            false,
-            false,
         )
         .unwrap();
 
@@ -202,33 +144,23 @@ mod config {
 count = 15
 bar_size = 30
 color = "always"
-subcommands = true
 ignore = ["ls", "cd"]
 "#;
         let config = FileConfig::parse(content).unwrap();
         assert_eq!(config.count, Some(15));
         assert_eq!(config.bar_size, Some(30));
         assert_eq!(config.color, Some(ColorMode::Always));
-        assert_eq!(config.subcommands, Some(true));
         assert_eq!(config.ignore, Some(vec!["ls".to_string(), "cd".to_string()]));
     }
 }
 
 mod utils {
-    use histop::utils::{clean_line, get_first_word, SUBCOMMAND_TOOLS};
+    use histop::utils::{clean_line, get_first_word};
 
     #[test]
-    fn test_subcommand_tools_contains_expected() {
-        assert!(SUBCOMMAND_TOOLS.contains(&"git"));
-        assert!(SUBCOMMAND_TOOLS.contains(&"cargo"));
-        assert!(SUBCOMMAND_TOOLS.contains(&"npm"));
-        assert!(SUBCOMMAND_TOOLS.contains(&"docker"));
-    }
-
-    #[test]
-    fn test_get_first_word_with_subcommand() {
-        let result = get_first_word("git status --short", &[], true);
-        assert_eq!(result, "git status");
+    fn test_get_first_word() {
+        let result = get_first_word("git status --short", &[]);
+        assert_eq!(result, "git");
     }
 
     #[test]

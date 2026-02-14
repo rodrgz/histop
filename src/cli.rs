@@ -1,10 +1,27 @@
 //! CLI argument parsing and configuration
 
-use std::{env, error::Error, fs, path::Path, path::PathBuf, process};
+use std::{env, fs, path::Path, path::PathBuf, process};
 
 use histop::color::ColorMode;
 use histop::config::FileConfig;
 use histop::output::OutputFormat;
+
+#[derive(Default)]
+struct CliOverrides {
+    file: Option<String>,
+    count: Option<usize>,
+    all: bool,
+    more_than: Option<usize>,
+    ignore: Option<Vec<String>>,
+    bar_size: Option<usize>,
+    no_bar: bool,
+    no_hist: bool,
+    no_cumu: bool,
+    no_perc: bool,
+    output_format: Option<OutputFormat>,
+    color_mode: Option<ColorMode>,
+    config_path: Option<String>,
+}
 
 /// Application configuration parsed from CLI arguments
 pub struct Config {
@@ -18,9 +35,6 @@ pub struct Config {
     pub no_hist: bool,
     pub no_cumu: bool,
     pub no_perc: bool,
-    pub verbose: bool,
-    pub fish_format: bool,
-    pub track_subcommands: bool,
     pub output_format: OutputFormat,
     pub color_mode: ColorMode,
 }
@@ -38,9 +52,6 @@ impl Default for Config {
             no_hist: false,
             no_cumu: false,
             no_perc: false,
-            verbose: false,
-            fish_format: false,
-            track_subcommands: false,
             output_format: OutputFormat::Text,
             color_mode: ColorMode::Auto,
         }
@@ -51,98 +62,78 @@ impl Config {
     /// Parse configuration from command line arguments
     pub fn from_args() -> Result<Self, String> {
         let args: Vec<String> = env::args().collect();
-        let mut config = Config::default();
-
-        // Load config file first (CLI args override)
-        if let Some(file_config) = FileConfig::load_default() {
-            config.apply_file_config(&file_config);
-        }
+        let mut cli_overrides = CliOverrides::default();
 
         let mut i = 1;
         while i < args.len() {
             match args[i].as_str() {
                 "-h" | "--help" => {
-                    print_help_message(config.count, config.bar_size);
+                    let mut help_config = Config::default();
+                    if let Some(file_config) = FileConfig::load_default() {
+                        help_config.apply_file_config(&file_config);
+                    }
+                    print_help_message(help_config.count, help_config.bar_size);
                     process::exit(0);
                 }
                 "-f" => {
-                    i += 1;
-                    if i < args.len() {
-                        config.file = args[i].clone();
-                    }
+                    let value = require_value_argument(&args, &mut i, "-f")?;
+                    cli_overrides.file = Some(value);
                 }
                 "-c" => {
-                    i += 1;
-                    if i < args.len() {
-                        config.count = parse_usize_argument(&args[i], "-c")?;
-                    }
+                    let value = require_value_argument(&args, &mut i, "-c")?;
+                    cli_overrides.count = Some(parse_usize_argument(&value, "-c")?);
                 }
                 "-a" => {
-                    config.all = true;
+                    cli_overrides.all = true;
                 }
                 "-m" => {
-                    i += 1;
-                    if i < args.len() {
-                        config.more_than = parse_usize_argument(&args[i], "-m")?;
-                    }
+                    let value = require_value_argument(&args, &mut i, "-m")?;
+                    cli_overrides.more_than = Some(parse_usize_argument(&value, "-m")?);
                 }
                 "-i" => {
-                    i += 1;
-                    if i < args.len() {
-                        config.ignore = args[i]
+                    let value = require_value_argument(&args, &mut i, "-i")?;
+                    cli_overrides.ignore = Some(
+                        value
                             .split('|')
                             .map(|s| s.trim().to_string())
-                            .collect();
-                    }
+                            .collect(),
+                    );
                 }
                 "-b" => {
-                    i += 1;
-                    if i < args.len() {
-                        config.bar_size = parse_usize_argument(&args[i], "-b")?;
-                    }
+                    let value = require_value_argument(&args, &mut i, "-b")?;
+                    cli_overrides.bar_size = Some(parse_usize_argument(&value, "-b")?);
                 }
                 "-n" => {
-                    config.no_bar = true;
+                    cli_overrides.no_bar = true;
                 }
                 "-nh" => {
-                    config.no_hist = true;
+                    cli_overrides.no_hist = true;
                 }
                 "-np" => {
-                    config.no_perc = true;
+                    cli_overrides.no_perc = true;
                 }
                 "-nc" => {
-                    config.no_cumu = true;
-                }
-                "-v" => {
-                    config.verbose = true;
-                }
-                "-F" => {
-                    config.fish_format = true;
-                }
-                "-s" | "--subcommands" => {
-                    config.track_subcommands = true;
+                    cli_overrides.no_cumu = true;
                 }
                 "-o" | "--output" => {
-                    i += 1;
-                    if i < args.len() {
-                        config.output_format = OutputFormat::parse(&args[i])
-                            .ok_or_else(|| format!("Invalid output format: {}. Use text, json, or csv", args[i]))?;
-                    }
+                    let value = require_value_argument(&args, &mut i, "-o/--output")?;
+                    cli_overrides.output_format = Some(
+                        OutputFormat::parse(&value).ok_or_else(|| {
+                            format!("Invalid output format: {}. Use text, json, or csv", value)
+                        })?,
+                    );
                 }
                 "--color" => {
-                    i += 1;
-                    if i < args.len() {
-                        config.color_mode = ColorMode::parse(&args[i])
-                            .ok_or_else(|| format!("Invalid color mode: {}. Use auto, always, or never", args[i]))?;
-                    }
+                    let value = require_value_argument(&args, &mut i, "--color")?;
+                    cli_overrides.color_mode = Some(
+                        ColorMode::parse(&value).ok_or_else(|| {
+                            format!("Invalid color mode: {}. Use auto, always, or never", value)
+                        })?,
+                    );
                 }
                 "--config" => {
-                    i += 1;
-                    if i < args.len() {
-                        let file_config = FileConfig::load(Path::new(&args[i]))
-                            .map_err(|e| format!("Failed to load config: {}", e))?;
-                        config.apply_file_config(&file_config);
-                    }
+                    let value = require_value_argument(&args, &mut i, "--config")?;
+                    cli_overrides.config_path = Some(value);
                 }
                 _ => {
                     return Err(format!("Invalid option: {}", args[i]));
@@ -151,25 +142,31 @@ impl Config {
             i += 1;
         }
 
+        let mut config = Config::default();
+        if let Some(file_config) = FileConfig::load_default() {
+            config.apply_file_config(&file_config);
+        }
+        if let Some(ref config_path) = cli_overrides.config_path {
+            let file_config = FileConfig::load(Path::new(config_path))
+                .map_err(|e| format!("Failed to load config: {}", e))?;
+            config.apply_file_config(&file_config);
+        }
+        config.apply_cli_overrides(&cli_overrides);
+
         if config.file.is_empty() {
             config.file = match get_histfile() {
                 Ok(s) => s,
-                Err(_) => {
-                    println!("Could not determine shell history file.");
-                    process::exit(1);
-                }
+                Err(e) => return Err(e),
             };
         }
 
         Ok(config)
     }
 
-    /// Apply settings from a file config (file settings don't override CLI)
+    /// Apply settings from a file config
     fn apply_file_config(&mut self, file_config: &FileConfig) {
         if let Some(ref ignore) = file_config.ignore {
-            if self.ignore.is_empty() {
-                self.ignore = ignore.clone();
-            }
+            self.ignore = ignore.clone();
         }
         if let Some(bar_size) = file_config.bar_size {
             self.bar_size = bar_size;
@@ -180,11 +177,47 @@ impl Config {
         if let Some(color) = file_config.color {
             self.color_mode = color;
         }
-        if let Some(subcommands) = file_config.subcommands {
-            self.track_subcommands = subcommands;
-        }
         if let Some(more_than) = file_config.more_than {
             self.more_than = more_than;
+        }
+    }
+
+    fn apply_cli_overrides(&mut self, overrides: &CliOverrides) {
+        if let Some(ref file) = overrides.file {
+            self.file = file.clone();
+        }
+        if let Some(count) = overrides.count {
+            self.count = count;
+        }
+        if overrides.all {
+            self.all = true;
+        }
+        if let Some(more_than) = overrides.more_than {
+            self.more_than = more_than;
+        }
+        if let Some(ref ignore) = overrides.ignore {
+            self.ignore = ignore.clone();
+        }
+        if let Some(bar_size) = overrides.bar_size {
+            self.bar_size = bar_size;
+        }
+        if overrides.no_bar {
+            self.no_bar = true;
+        }
+        if overrides.no_hist {
+            self.no_hist = true;
+        }
+        if overrides.no_cumu {
+            self.no_cumu = true;
+        }
+        if overrides.no_perc {
+            self.no_perc = true;
+        }
+        if let Some(output_format) = overrides.output_format {
+            self.output_format = output_format;
+        }
+        if let Some(color_mode) = overrides.color_mode {
+            self.color_mode = color_mode;
         }
     }
 }
@@ -199,100 +232,169 @@ fn parse_usize_argument(arg: &str, flag: &str) -> Result<usize, String> {
     }
 }
 
+fn require_value_argument(args: &[String], i: &mut usize, flag: &str) -> Result<String, String> {
+    *i += 1;
+    if *i >= args.len() {
+        return Err(format!("Missing value for {}", flag));
+    }
+    Ok(args[*i].clone())
+}
+
 /// Get the history file path
 ///
 /// Uses platform-specific detection:
 /// - Linux: reads /proc/self/stat to find parent shell
 /// - Other platforms: falls back to $SHELL environment variable
-fn get_histfile() -> Result<String, Box<dyn Error>> {
-    // First check HISTFILE environment variable
+fn get_histfile() -> Result<String, String> {
+    let mut checked_paths: Vec<String> = Vec::new();
+
     if let Ok(histfile) = env::var("HISTFILE") {
-        if let Ok(metadata) = fs::metadata(&histfile) {
-            if metadata.is_file() {
-                return Ok(histfile);
-            }
-        } else {
-            eprintln!("HISTFILE does not exist");
-            return Err("HISTFILE does not exist".into());
+        checked_paths.push(histfile.clone());
+        if is_regular_file(&histfile) {
+            return Ok(histfile);
         }
     }
 
     let home = env::var("HOME").unwrap_or_default();
-    let user = env::var("USER").unwrap_or_default();
+    if home.is_empty() {
+        return Err("Could not determine shell history file: HOME environment variable is not set".to_string());
+    }
 
-    // Try to detect parent shell
-    let shell = get_parent_shell()?;
-
-    match shell.as_str() {
-        "ash" => Ok(format!("/home/{}/.ash_history", user)),
-        "bash" => Ok(format!("/home/{}/.bash_history", user)),
-        "fish" => {
-            let histfile = format!("{}/.local/share/fish/fish_history", home);
-            if fs::metadata(&histfile).is_ok() {
-                Ok(histfile)
-            } else {
-                Err(format!("Fish history not found at {}", histfile).into())
-            }
-        }
-        "zsh" => {
-            // Try XDG config location first
-            let histfile = format!("/home/{}/.config/zsh/.zsh_history", user);
-            if let Ok(metadata) = fs::metadata(&histfile) {
-                if metadata.is_file() {
-                    return Ok(histfile);
-                }
-            }
-            // Fall back to home directory
-            let histfile = format!("/home/{}/.zsh_history", user);
-            if fs::metadata(&histfile).is_ok() {
-                Ok(histfile)
-            } else {
-                Err("Zsh history not found".into())
-            }
-        }
-        _ => {
-            eprintln!("Unknown shell: {}", shell);
-            Err("Unknown shell".into())
+    let mut shell_hints: Vec<String> = Vec::new();
+    if let Ok(parent_shell) = get_parent_shell() {
+        push_unique(&mut shell_hints, parent_shell);
+    }
+    if let Ok(shell_path) = env::var("SHELL") {
+        if let Some(shell_name) = Path::new(&shell_path).file_name().and_then(|f| f.to_str()) {
+            push_unique(&mut shell_hints, shell_name.to_string());
         }
     }
+
+    let mut candidate_paths: Vec<String> = Vec::new();
+    for shell in &shell_hints {
+        for candidate in shell_history_candidates(&home, shell) {
+            push_unique(&mut candidate_paths, candidate);
+        }
+    }
+    for candidate in default_history_candidates(&home) {
+        push_unique(&mut candidate_paths, candidate);
+    }
+
+    for candidate in candidate_paths {
+        checked_paths.push(candidate.clone());
+        if is_regular_file(&candidate) {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!(
+        "Could not determine shell history file. Checked: {}",
+        checked_paths.join(", ")
+    ))
+}
+
+fn is_regular_file(path: &str) -> bool {
+    fs::metadata(path).map(|meta| meta.is_file()).unwrap_or(false)
+}
+
+fn push_unique(values: &mut Vec<String>, value: String) {
+    if !values.iter().any(|existing| existing == &value) {
+        values.push(value);
+    }
+}
+
+fn shell_history_candidates(home: &str, shell: &str) -> Vec<String> {
+    match shell {
+        "ash" => vec![format!("{}/.ash_history", home)],
+        "bash" => vec![format!("{}/.bash_history", home)],
+        "fish" => vec![format!("{}/.local/share/fish/fish_history", home)],
+        "zsh" => vec![
+            format!("{}/.config/zsh/.zsh_history", home),
+            format!("{}/.zsh_history", home),
+        ],
+        _ => Vec::new(),
+    }
+}
+
+fn default_history_candidates(home: &str) -> Vec<String> {
+    vec![
+        format!("{}/.bash_history", home),
+        format!("{}/.zsh_history", home),
+        format!("{}/.config/zsh/.zsh_history", home),
+        format!("{}/.ash_history", home),
+        format!("{}/.local/share/fish/fish_history", home),
+    ]
 }
 
 /// Get the parent shell name
 ///
 /// Uses platform-specific detection
 #[cfg(target_os = "linux")]
-fn get_parent_shell() -> Result<String, Box<dyn Error>> {
-    let stat_contents = fs::read_to_string("/proc/self/stat")?;
+fn get_parent_shell() -> Result<String, String> {
+    let stat_contents = fs::read_to_string("/proc/self/stat")
+        .map_err(|e| format!("Failed to read /proc/self/stat: {}", e))?;
     let fields: Vec<&str> = stat_contents.split_whitespace().collect();
-    let ppid = fields
-        .get(3)
-        .ok_or("Invalid /proc/self/stat format")?;
+    let ppid = fields.get(3).ok_or("Invalid /proc/self/stat format")?;
 
     let cmdline_file = PathBuf::from(format!("/proc/{}/cmdline", ppid));
-    let cmdline_contents = fs::read_to_string(&cmdline_file)
-        .map_err(|e| format!("Failed to read {}: {}", cmdline_file.display(), e))?;
+    let cmdline_contents =
+        fs::read(&cmdline_file).map_err(|e| format!("Failed to read {}: {}", cmdline_file.display(), e))?;
+    let first_arg = cmdline_contents
+        .split(|b| *b == b'\0')
+        .next()
+        .ok_or_else(|| "Failed to parse parent cmdline".to_string())?;
+    let first_arg = std::str::from_utf8(first_arg)
+        .map_err(|_| "Failed to decode parent cmdline".to_string())?;
 
-    let parent_cmdline = Path::new(&cmdline_contents)
+    let parent_cmdline = Path::new(first_arg)
         .file_name()
         .and_then(|f| f.to_str())
-        .map(|s| s.trim_end_matches('\0'))
-        .ok_or("Failed to parse parent cmdline")?;
+        .ok_or_else(|| "Failed to parse parent cmdline".to_string())?;
 
     Ok(parent_cmdline.to_string())
 }
 
 /// Fallback for non-Linux platforms: use $SHELL environment variable
 #[cfg(not(target_os = "linux"))]
-fn get_parent_shell() -> Result<String, Box<dyn Error>> {
+fn get_parent_shell() -> Result<String, String> {
     env::var("SHELL")
-        .map_err(|_| "SHELL environment variable not set".into())
+        .map_err(|_| "SHELL environment variable not set".to_string())
         .and_then(|shell| {
             Path::new(&shell)
                 .file_name()
                 .and_then(|f| f.to_str())
                 .map(|s| s.to_string())
-                .ok_or_else(|| "Failed to parse SHELL".into())
+                .ok_or_else(|| "Failed to parse SHELL".to_string())
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shell_history_candidates_zsh() {
+        let candidates = shell_history_candidates("/tmp/home", "zsh");
+        assert_eq!(candidates.len(), 2);
+        assert!(candidates[0].ends_with(".config/zsh/.zsh_history"));
+        assert!(candidates[1].ends_with(".zsh_history"));
+    }
+
+    #[test]
+    fn test_default_history_candidates_contains_common_shells() {
+        let candidates = default_history_candidates("/tmp/home");
+        assert!(candidates.iter().any(|c| c.ends_with(".bash_history")));
+        assert!(candidates.iter().any(|c| c.ends_with(".zsh_history")));
+        assert!(candidates.iter().any(|c| c.ends_with("fish_history")));
+    }
+
+    #[test]
+    fn test_push_unique() {
+        let mut values = vec!["bash".to_string()];
+        push_unique(&mut values, "bash".to_string());
+        push_unique(&mut values, "zsh".to_string());
+        assert_eq!(values, vec!["bash".to_string(), "zsh".to_string()]);
+    }
 }
 
 fn print_help_message(count: usize, bar_size: usize) {
@@ -309,9 +411,6 @@ fn print_help_message(count: usize, bar_size: usize) {
         \u{A0}-nh              Disable history mode (can be used for any data)\n\
         \u{A0}-np              Do not print the percentage in the bar\n\
         \u{A0}-nc              Do not print the inverse cumulative percentage in the bar\n\
-        \u{A0}-v               Verbose\n\
-        \u{A0}-F               Force fish history format parsing\n\
-        \u{A0}-s, --subcommands  Track subcommands for git, cargo, npm, etc.\n\
         \u{A0}-o, --output <FMT> Output format: text (default), json, csv\n\
         \u{A0}--color <WHEN>   Color output: auto (default), always, never\n\
         \u{A0}--config <PATH>  Path to config file\n\

@@ -46,9 +46,6 @@ mod help_flag {
         assert!(stdout.contains("-nh"));
         assert!(stdout.contains("-np"));
         assert!(stdout.contains("-nc"));
-        assert!(stdout.contains("-v"));
-        assert!(stdout.contains("-F"));
-        assert!(stdout.contains("-s, --subcommands"));
         assert!(stdout.contains("-o, --output"));
         assert!(stdout.contains("--color"));
         assert!(stdout.contains("--config"));
@@ -325,68 +322,6 @@ mod no_percentage_flags {
     }
 }
 
-mod verbose_flag {
-    use super::*;
-
-    #[test]
-    fn test_verbose_flag() {
-        let path = fixtures_path().join("bash_history");
-        let output = run_histop(&["-f", path.to_str().unwrap(), "-v", "-c", "3"]);
-        
-        assert!(output.status.success());
-    }
-}
-
-mod fish_format_flag {
-    use super::*;
-
-    #[test]
-    fn test_fish_format_flag() {
-        let path = fixtures_path().join("fish_history");
-        let output = run_histop(&["-f", path.to_str().unwrap(), "-F"]);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        
-        assert!(output.status.success());
-        // Should parse fish history and show commands
-        assert!(stdout.contains("git") || stdout.contains("ls"));
-    }
-
-    #[test]
-    fn test_fish_format_with_non_fish_file() {
-        let path = fixtures_path().join("bash_history");
-        // Forcing fish format on bash history should still not crash
-        let output = run_histop(&["-f", path.to_str().unwrap(), "-F"]);
-        
-        // Should not crash, but may produce different results
-        assert!(output.status.success());
-    }
-}
-
-mod subcommands_flag {
-    use super::*;
-
-    #[test]
-    fn test_subcommands_short_flag() {
-        let path = fixtures_path().join("bash_history");
-        let output = run_histop(&["-f", path.to_str().unwrap(), "-s", "-a"]);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        
-        assert!(output.status.success());
-        // With subcommand tracking, should show "git status" instead of just "git"
-        assert!(stdout.contains("git status") || stdout.contains("git commit") || stdout.contains("cargo build"));
-    }
-
-    #[test]
-    fn test_subcommands_long_flag() {
-        let path = fixtures_path().join("bash_history");
-        let output = run_histop(&["-f", path.to_str().unwrap(), "--subcommands", "-a"]);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        
-        assert!(output.status.success());
-        assert!(stdout.contains("git status") || stdout.contains("git commit") || stdout.contains("cargo build"));
-    }
-}
-
 mod output_format_flag {
     use super::*;
 
@@ -535,6 +470,42 @@ mod config_flag {
         
         assert!(!output.status.success());
     }
+
+    #[test]
+    fn test_cli_precedence_over_config_is_order_independent() {
+        let path = fixtures_path().join("bash_history");
+
+        let config_dir = std::env::temp_dir().join("histop_test_config_precedence");
+        std::fs::create_dir_all(&config_dir).ok();
+        let config_path = config_dir.join("test_config.toml");
+
+        let mut file = std::fs::File::create(&config_path).unwrap();
+        writeln!(file, "count = 4").unwrap();
+
+        let output_config_then_cli = run_histop(&[
+            "-f", path.to_str().unwrap(),
+            "--config", config_path.to_str().unwrap(),
+            "-c", "1",
+        ]);
+        let output_cli_then_config = run_histop(&[
+            "-f", path.to_str().unwrap(),
+            "-c", "1",
+            "--config", config_path.to_str().unwrap(),
+        ]);
+
+        assert!(output_config_then_cli.status.success());
+        assert!(output_cli_then_config.status.success());
+
+        let stdout1 = String::from_utf8_lossy(&output_config_then_cli.stdout);
+        let stdout2 = String::from_utf8_lossy(&output_cli_then_config.stdout);
+        let lines1: Vec<&str> = stdout1.lines().filter(|l| !l.is_empty()).collect();
+        let lines2: Vec<&str> = stdout2.lines().filter(|l| !l.is_empty()).collect();
+
+        assert_eq!(lines1.len(), 1);
+        assert_eq!(lines2.len(), 1);
+
+        std::fs::remove_file(&config_path).ok();
+    }
 }
 
 mod invalid_options {
@@ -555,6 +526,97 @@ mod invalid_options {
         
         assert!(!output.status.success());
     }
+
+    #[test]
+    fn test_removed_verbose_option() {
+        let output = run_histop(&["-v"]);
+        assert!(!output.status.success());
+    }
+
+    #[test]
+    fn test_removed_fish_force_option() {
+        let output = run_histop(&["-F"]);
+        assert!(!output.status.success());
+    }
+
+    #[test]
+    fn test_removed_subcommands_option() {
+        let output = run_histop(&["-s"]);
+        assert!(!output.status.success());
+    }
+}
+
+mod missing_value_options {
+    use super::*;
+
+    fn assert_missing_value(args: &[&str]) {
+        let output = run_histop(args);
+        assert!(!output.status.success());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("Missing value"));
+    }
+
+    #[test]
+    fn test_missing_file_value() {
+        assert_missing_value(&["-f"]);
+    }
+
+    #[test]
+    fn test_missing_count_value() {
+        assert_missing_value(&["-c"]);
+    }
+
+    #[test]
+    fn test_missing_more_than_value() {
+        assert_missing_value(&["-m"]);
+    }
+
+    #[test]
+    fn test_missing_ignore_value() {
+        assert_missing_value(&["-i"]);
+    }
+
+    #[test]
+    fn test_missing_bar_size_value() {
+        assert_missing_value(&["-b"]);
+    }
+
+    #[test]
+    fn test_missing_output_value() {
+        assert_missing_value(&["-o"]);
+    }
+
+    #[test]
+    fn test_missing_color_value() {
+        assert_missing_value(&["--color"]);
+    }
+
+    #[test]
+    fn test_missing_config_value() {
+        assert_missing_value(&["--config"]);
+    }
+}
+
+#[cfg(unix)]
+mod output_errors {
+    use super::*;
+    use std::fs::OpenOptions;
+    use std::process::Stdio;
+
+    #[test]
+    fn test_stdout_write_error_returns_controlled_failure() {
+        let path = fixtures_path().join("bash_history");
+        let full = OpenOptions::new().write(true).open("/dev/full").unwrap();
+
+        let status = Command::new(histop_bin())
+            .args(["-f", path.to_str().unwrap()])
+            .stdout(Stdio::from(full))
+            .status()
+            .expect("Failed to execute histop");
+
+        assert!(!status.success());
+        assert_ne!(status.code(), Some(101));
+    }
 }
 
 mod combined_flags {
@@ -566,7 +628,6 @@ mod combined_flags {
         let output = run_histop(&[
             "-f", path.to_str().unwrap(),
             "-c", "5",
-            "-s",
             "-n",
             "--color", "never"
         ]);
@@ -584,20 +645,17 @@ mod combined_flags {
     }
 
     #[test]
-    fn test_json_output_with_subcommands() {
+    fn test_json_output() {
         let path = fixtures_path().join("bash_history");
         let output = run_histop(&[
             "-f", path.to_str().unwrap(),
             "-o", "json",
-            "-s",
             "-c", "5"
         ]);
         let stdout = String::from_utf8_lossy(&output.stdout);
         
         assert!(output.status.success());
         assert!(stdout.contains("\"command\":"));
-        // Should contain subcommand format
-        assert!(stdout.contains("git ") || stdout.contains("cargo "));
     }
 
     #[test]

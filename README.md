@@ -36,8 +36,6 @@ Usage: histop [options]
  -nh              Disable history mode (can be used for any data)
  -np              Do not print the percentage in the bar
  -nc              Do not print the inverse cumulative percentage in the bar
- -v               Verbose
- -F               Force fish history format parsing
  ██               Percentage
  ▓▓               Inverse cumulative percentage
 ```
@@ -66,12 +64,6 @@ Fish is now natively supported! Just run `histop` from a Fish shell, or use `-f`
 $ histop -f ~/.local/share/fish/fish_history
 ```
 
-For custom YAML-like history files compatible with Fish format, use `-F` to force parsing:
-
-```
-$ histop -F -f /path/to/custom/history
-```
-
 ## Testing
 
 ### Running All Tests
@@ -81,9 +73,9 @@ cargo test
 ```
 
 This runs all tests:
-- **Unit tests** (38 tests) — test individual functions in each module
-- **Integration tests** (14 tests) — test history parsing with fixture files
-- **CLI tests** (42 tests) — test all command-line options end-to-end
+- **Unit tests** (47 tests) — test individual functions in each module
+- **Integration tests** (10 tests) — test history parsing with fixture files
+- **CLI tests** (50 tests) — test all command-line options end-to-end
 
 ### Running Specific Test Suites
 
@@ -107,6 +99,11 @@ Test fixtures are located in `tests/fixtures/`:
 
 ## Requirements
 
-1. Rust 1.46 or later
+1. Rust 1.85 or later (edition 2024)
 2. Cargo package manager
 
+## Common Errors
+
+- `Could not determine shell history file`: use `-f <FILE>` explicitly or configure `HISTFILE`.
+- `Missing value for ...`: one of the options requiring a parameter was passed sem valor.
+- `Invalid ... argument, must be a positive integer`: revise numeric values for `-c`, `-b` e `-m`.

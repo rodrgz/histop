@@ -19,16 +19,12 @@ use crate::utils::get_first_word;
 /// # Arguments
 /// * `file_path` - Path to the fish_history file
 /// * `ignore` - List of commands to ignore
-/// * `track_subcommands` - If true, track subcommands for common tools
-/// * `_verbose` - Enable verbose output (reserved for future use)
 ///
 /// # Returns
 /// A HashMap of command -> count
 pub fn count_from_file(
     file_path: &str,
     ignore: &[String],
-    track_subcommands: bool,
-    _verbose: bool,
 ) -> Result<HashMap<String, usize>, std::io::Error> {
     let file = fs::File::open(file_path)?;
     let reader = BufReader::new(file);
@@ -43,7 +39,7 @@ pub fn count_from_file(
         if let Some(cmd) = line.strip_prefix("- cmd: ") {
             let cmd = cmd.trim();
             if !cmd.is_empty() {
-                let first_word = get_first_word(cmd, &ignore_refs, track_subcommands);
+                let first_word = get_first_word(cmd, &ignore_refs);
                 if !first_word.is_empty() {
                     *cmd_count.entry(first_word.into_owned()).or_default() += 1;
                 }
@@ -73,27 +69,9 @@ mod tests {
         writeln!(file, "- cmd: ls").unwrap();
         writeln!(file, "  when: 1680820393").unwrap();
 
-        let result = count_from_file(path.to_str().unwrap(), &[], false, false).unwrap();
+        let result = count_from_file(path.to_str().unwrap(), &[]).unwrap();
         assert_eq!(result.get("ls"), Some(&2));
         assert_eq!(result.get("git"), Some(&1));
-
-        fs::remove_file(path).ok();
-    }
-
-    #[test]
-    fn test_count_with_subcommands() {
-        use std::io::Write;
-        let dir = std::env::temp_dir();
-        let path = dir.join("test_fish_history_sub");
-        let mut file = fs::File::create(&path).unwrap();
-        writeln!(file, "- cmd: git status").unwrap();
-        writeln!(file, "  when: 1680820391").unwrap();
-        writeln!(file, "- cmd: git commit -m test").unwrap();
-        writeln!(file, "  when: 1680820392").unwrap();
-
-        let result = count_from_file(path.to_str().unwrap(), &[], true, false).unwrap();
-        assert_eq!(result.get("git status"), Some(&1));
-        assert_eq!(result.get("git commit"), Some(&1));
 
         fs::remove_file(path).ok();
     }
