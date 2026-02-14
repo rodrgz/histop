@@ -160,7 +160,7 @@ mod utils {
     #[test]
     fn test_get_first_word() {
         let result = get_first_word("git status --short", &[]);
-        assert_eq!(result, "git");
+        assert_eq!(result, Some("git"));
     }
 
     #[test]

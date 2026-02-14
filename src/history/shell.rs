@@ -15,9 +15,9 @@ pub fn count_from_file(
     no_hist: bool,
 ) -> Result<HashMap<String, usize>, std::io::Error> {
     let file = fs::File::open(file_path)?;
-    let reader = BufReader::new(file);
+    let mut reader = BufReader::new(file);
 
-    let mut filtered_commands: Vec<&str> = Vec::new();
+    let mut filtered_commands: Vec<&str> = Vec::with_capacity(ignore.len() + 2);
     if !no_hist {
         filtered_commands.extend(["sudo", "doas"]);
     }
@@ -27,22 +27,24 @@ pub fn count_from_file(
     filtered_commands.extend(ignore_refs);
 
     let mut skip = false;
-    let mut cmd_count: HashMap<String, usize> = HashMap::new();
+    let mut cmd_count: HashMap<String, usize> = HashMap::with_capacity(256);
+    let mut line_buf: Vec<u8> = Vec::with_capacity(256);
 
-    for line_result in reader.lines() {
-        let line = match line_result {
-            Ok(line) => line,
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::InvalidData {
-                    continue;
-                } else {
-                    return Err(e);
-                }
-            }
+    loop {
+        line_buf.clear();
+        let bytes_read = reader.read_until(b'\n', &mut line_buf)?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        let line = match std::str::from_utf8(&line_buf) {
+            Ok(line) => trim_line_end(line),
+            Err(_) => continue,
         };
 
         // Handle zsh extended history format: ": timestamp:0;command"
-        let actual_line = if line.starts_with(": ") {
+        let is_zsh_extended = line.starts_with(": ");
+        let actual_line = if is_zsh_extended {
             if let Some((_, cmd)) = line.split_once(';') {
                 cmd
             } else {
@@ -51,10 +53,10 @@ pub fn count_from_file(
                 continue;
             }
         } else {
-            line.as_str()
+            line
         };
 
-        match (skip, line.starts_with(": ") && !line.contains(';'), line.ends_with("\\")) {
+        match (skip, is_zsh_extended && !line.contains(';'), actual_line.ends_with('\\')) {
             (false, false, false) => {
                 count_commands(&mut cmd_count, actual_line, &filtered_commands, no_hist);
             }
@@ -77,6 +79,11 @@ pub fn count_from_file(
     Ok(cmd_count)
 }
 
+#[inline]
+fn trim_line_end(line: &str) -> &str {
+    line.trim_end_matches(['\n', '\r'])
+}
+
 fn count_commands(
     cmd_count: &mut HashMap<String, usize>,
     line: &str,
@@ -84,18 +91,33 @@ fn count_commands(
     no_hist: bool,
 ) {
     if line.contains("|") && !no_hist {
-        let cleaned_line = clean_line(line);
-        for subcommand in cleaned_line.split('|') {
-            let first_word = get_first_word(subcommand, filtered_commands);
-            if !first_word.is_empty() {
-                *cmd_count.entry(first_word.into_owned()).or_default() += 1;
+        if line.contains('\'') || line.contains('"') {
+            let cleaned_line = clean_line(line);
+            for subcommand in cleaned_line.split('|') {
+                if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
+                    increment_count(cmd_count, first_word);
+                }
+            }
+        } else {
+            for subcommand in line.split('|') {
+                if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
+                    increment_count(cmd_count, first_word);
+                }
             }
         }
     } else {
-        let first_word = get_first_word(line, filtered_commands);
-        if !first_word.is_empty() {
-            *cmd_count.entry(first_word.into_owned()).or_default() += 1;
+        if let Some(first_word) = get_first_word(line, filtered_commands) {
+            increment_count(cmd_count, first_word);
         }
+    }
+}
+
+#[inline]
+fn increment_count(cmd_count: &mut HashMap<String, usize>, first_word: &str) {
+    if let Some(existing) = cmd_count.get_mut(first_word) {
+        *existing += 1;
+    } else {
+        cmd_count.insert(first_word.to_string(), 1);
     }
 }
 

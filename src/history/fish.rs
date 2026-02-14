@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::io::{self, BufRead, BufReader};
 
 use crate::shared::command_parse::get_first_word;
 
@@ -27,28 +27,42 @@ pub fn count_from_file(
     ignore: &[String],
 ) -> Result<HashMap<String, usize>, std::io::Error> {
     let file = fs::File::open(file_path)?;
-    let reader = BufReader::new(file);
-    let mut cmd_count: HashMap<String, usize> = HashMap::new();
+    let mut reader = BufReader::new(file);
+    let mut cmd_count: HashMap<String, usize> = HashMap::with_capacity(256);
 
     let ignore_refs: Vec<&str> = ignore.iter().map(|s| s.as_str()).collect();
+    let mut line_buf: Vec<u8> = Vec::with_capacity(256);
 
-    for line in reader.lines() {
-        let line = line?;
+    loop {
+        line_buf.clear();
+        let bytes_read = reader.read_until(b'\n', &mut line_buf)?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        let line = std::str::from_utf8(&line_buf).map_err(|e| {
+            io::Error::new(io::ErrorKind::InvalidData, e)
+        })?;
 
         // Fish history command lines start with "- cmd: "
         if let Some(cmd) = line.strip_prefix("- cmd: ") {
-            let cmd = cmd.trim();
-            if !cmd.is_empty() {
-                let first_word = get_first_word(cmd, &ignore_refs);
-                if !first_word.is_empty() {
-                    *cmd_count.entry(first_word.into_owned()).or_default() += 1;
-                }
+            if let Some(first_word) = get_first_word(cmd, &ignore_refs) {
+                increment_count(&mut cmd_count, first_word);
             }
         }
         // Lines starting with "  when:" or "  paths:" are metadata, skip them
     }
 
     Ok(cmd_count)
+}
+
+#[inline]
+fn increment_count(cmd_count: &mut HashMap<String, usize>, first_word: &str) {
+    if let Some(existing) = cmd_count.get_mut(first_word) {
+        *existing += 1;
+    } else {
+        cmd_count.insert(first_word.to_string(), 1);
+    }
 }
 
 #[cfg(test)]

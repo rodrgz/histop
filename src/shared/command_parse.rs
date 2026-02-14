@@ -1,7 +1,5 @@
 //! Shared utilities for command parsing and processing.
 
-use std::borrow::Cow;
-
 /// Extract the first meaningful word(s) from a command.
 ///
 /// # Arguments
@@ -9,12 +7,29 @@ use std::borrow::Cow;
 /// * `filtered` - Commands to skip (like sudo, doas)
 ///
 /// # Returns
-/// The first command word
+/// The first command word, if one exists
 #[inline]
-pub fn get_first_word<'a>(cmd: &'a str, filtered: &[&str]) -> Cow<'a, str> {
-    let mut words = cmd.split_whitespace().peekable();
+pub fn get_first_word<'a>(cmd: &'a str, filtered: &[&str]) -> Option<&'a str> {
+    if filtered.is_empty() {
+        for w in cmd.split_whitespace() {
+            // Skip environment variable assignments (FOO=bar) but not expansions ($FOO)
+            if w.contains('=') && !w.starts_with('$') {
+                continue;
+            }
 
-    while let Some(w) = words.next() {
+            if let Some(unescaped) = w.strip_prefix('\\') {
+                if !unescaped.is_empty() {
+                    return Some(unescaped);
+                }
+                continue;
+            }
+
+            return Some(w);
+        }
+        return None;
+    }
+
+    for w in cmd.split_whitespace() {
         // Skip filtered commands (sudo, doas, etc.)
         if filtered.contains(&w) {
             continue;
@@ -26,20 +41,17 @@ pub fn get_first_word<'a>(cmd: &'a str, filtered: &[&str]) -> Cow<'a, str> {
         }
 
         // Handle escaped commands (\ls -> ls)
-        let word = if w.starts_with('\\') && w.len() > 1 {
-            let unescaped = &w[1..];
-            if filtered.contains(&unescaped) {
+        if let Some(unescaped) = w.strip_prefix('\\') {
+            if unescaped.is_empty() || filtered.contains(&unescaped) {
                 continue;
             }
-            unescaped
-        } else {
-            w
-        };
+            return Some(unescaped);
+        }
 
-        return Cow::Borrowed(word);
+        return Some(w);
     }
 
-    Cow::Borrowed("")
+    None
 }
 
 /// Clean a command line by replacing pipes inside quotes with spaces.
@@ -82,55 +94,55 @@ mod tests {
     #[test]
     fn test_get_first_word_simple() {
         let filters = vec!["sudo", "doas"];
-        assert_eq!(get_first_word("ls -la", &filters), "ls");
+        assert_eq!(get_first_word("ls -la", &filters), Some("ls"));
     }
 
     #[test]
     fn test_get_first_word_with_sudo() {
         let filters = vec!["sudo", "doas"];
-        assert_eq!(get_first_word("sudo apt update", &filters), "apt");
+        assert_eq!(get_first_word("sudo apt update", &filters), Some("apt"));
     }
 
     #[test]
     fn test_get_first_word_with_doas() {
         let filters = vec!["sudo", "doas"];
-        assert_eq!(get_first_word("doas pacman -S vim", &filters), "pacman");
+        assert_eq!(get_first_word("doas pacman -S vim", &filters), Some("pacman"));
     }
 
     #[test]
     fn test_get_first_word_env_var_prefix() {
         let filters = vec![];
-        assert_eq!(get_first_word("FOO=bar cmd arg", &filters), "cmd");
+        assert_eq!(get_first_word("FOO=bar cmd arg", &filters), Some("cmd"));
     }
 
     #[test]
     fn test_get_first_word_escaped_command() {
         let filters = vec![];
-        assert_eq!(get_first_word("\\ls -la", &filters), "ls");
+        assert_eq!(get_first_word("\\ls -la", &filters), Some("ls"));
     }
 
     #[test]
     fn test_get_first_word_escaped_filtered() {
         let filters = vec!["sudo"];
-        assert_eq!(get_first_word("\\sudo apt", &filters), "apt");
+        assert_eq!(get_first_word("\\sudo apt", &filters), Some("apt"));
     }
 
     #[test]
     fn test_get_first_word_empty() {
         let filters: Vec<&str> = vec![];
-        assert_eq!(get_first_word("", &filters), "");
+        assert_eq!(get_first_word("", &filters), None);
     }
 
     #[test]
     fn test_get_first_word_whitespace_only() {
         let filters: Vec<&str> = vec![];
-        assert_eq!(get_first_word("   ", &filters), "");
+        assert_eq!(get_first_word("   ", &filters), None);
     }
 
     #[test]
     fn test_get_first_word_preserves_expansion() {
         let filters: Vec<&str> = vec![];
-        assert_eq!(get_first_word("$EDITOR file.txt", &filters), "$EDITOR");
+        assert_eq!(get_first_word("$EDITOR file.txt", &filters), Some("$EDITOR"));
     }
 
     #[test]
