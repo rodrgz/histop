@@ -2,6 +2,7 @@
 //!
 //! A library for analyzing shell history files and presenting command usage statistics.
 
+pub mod app;
 pub mod bar;
 pub mod color;
 pub mod config;
