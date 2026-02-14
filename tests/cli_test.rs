@@ -4,6 +4,7 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Get the path to the histop binary
 fn histop_bin() -> PathBuf {
@@ -23,6 +24,14 @@ fn run_histop(args: &[&str]) -> std::process::Output {
         .args(args)
         .output()
         .expect("Failed to execute histop")
+}
+
+fn unique_temp_path(prefix: &str, suffix: &str) -> PathBuf {
+    let now_nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    std::env::temp_dir().join(format!("{}_{}_{}{}", prefix, std::process::id(), now_nanos, suffix))
 }
 
 mod help_flag {
@@ -206,6 +215,14 @@ mod more_than_flag {
         // Should have no output or minimal output
         let lines: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
         assert!(lines.is_empty(), "Expected no output with high threshold");
+    }
+
+    #[test]
+    fn test_more_than_flag_with_zero() {
+        let path = fixtures_path().join("bash_history");
+        let output = run_histop(&["-f", path.to_str().unwrap(), "-m", "0", "-c", "1"]);
+
+        assert!(output.status.success());
     }
 }
 
@@ -434,28 +451,25 @@ mod config_flag {
     #[test]
     fn test_config_flag_with_valid_config() {
         let path = fixtures_path().join("bash_history");
-        
+
         // Create a temporary config file
-        let config_dir = std::env::temp_dir().join("histop_test_config");
-        std::fs::create_dir_all(&config_dir).ok();
-        let config_path = config_dir.join("test_config.toml");
-        
+        let config_path = unique_temp_path("histop_test_config", ".toml");
         let mut file = std::fs::File::create(&config_path).unwrap();
         writeln!(file, "count = 2").unwrap();
         writeln!(file, "color = \"never\"").unwrap();
-        
+
         let output = run_histop(&[
             "-f", path.to_str().unwrap(),
             "--config", config_path.to_str().unwrap()
         ]);
         let stdout = String::from_utf8_lossy(&output.stdout);
-        
+
         assert!(output.status.success());
-        
+
         // Should respect config count = 2
         let lines: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
         assert!(lines.len() <= 2, "Expected at most 2 lines from config, got {}", lines.len());
-        
+
         // Cleanup
         std::fs::remove_file(&config_path).ok();
     }
@@ -475,9 +489,7 @@ mod config_flag {
     fn test_cli_precedence_over_config_is_order_independent() {
         let path = fixtures_path().join("bash_history");
 
-        let config_dir = std::env::temp_dir().join("histop_test_config_precedence");
-        std::fs::create_dir_all(&config_dir).ok();
-        let config_path = config_dir.join("test_config.toml");
+        let config_path = unique_temp_path("histop_test_config_precedence", ".toml");
 
         let mut file = std::fs::File::create(&config_path).unwrap();
         writeln!(file, "count = 4").unwrap();
@@ -503,6 +515,26 @@ mod config_flag {
 
         assert_eq!(lines1.len(), 1);
         assert_eq!(lines2.len(), 1);
+
+        std::fs::remove_file(&config_path).ok();
+    }
+
+    #[test]
+    fn test_config_flag_with_invalid_color_value() {
+        let path = fixtures_path().join("bash_history");
+        let config_path = unique_temp_path("histop_test_config_invalid_color", ".toml");
+
+        let mut file = std::fs::File::create(&config_path).unwrap();
+        writeln!(file, "color = \"sometimes\"").unwrap();
+
+        let output = run_histop(&[
+            "-f", path.to_str().unwrap(),
+            "--config", config_path.to_str().unwrap()
+        ]);
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("invalid 'color' value"));
 
         std::fs::remove_file(&config_path).ok();
     }

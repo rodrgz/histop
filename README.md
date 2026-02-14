@@ -106,4 +106,4 @@ Test fixtures are located in `tests/fixtures/`:
 
 - `Could not determine shell history file`: use `-f <FILE>` explicitly or configure `HISTFILE`.
 - `Missing value for ...`: one of the options requiring a parameter was passed sem valor.
-- `Invalid ... argument, must be a positive integer`: revise numeric values for `-c`, `-b` e `-m`.
+- `Invalid ... argument`: revise numeric values (`-c` e `-b` require positive integer; `-m` accepts non-negative integer).

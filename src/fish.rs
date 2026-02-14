@@ -59,8 +59,16 @@ mod tests {
     fn test_count_simple_commands() {
         // Create a temp file with fish history format
         use std::io::Write;
-        let dir = std::env::temp_dir();
-        let path = dir.join("test_fish_history");
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now_nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "test_fish_history_{}_{}",
+            std::process::id(),
+            now_nanos
+        ));
         let mut file = fs::File::create(&path).unwrap();
         writeln!(file, "- cmd: ls -la").unwrap();
         writeln!(file, "  when: 1680820391").unwrap();

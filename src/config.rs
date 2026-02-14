@@ -81,7 +81,13 @@ impl FileConfig {
                     let color = parse_string(&parsed.value).map_err(|e| {
                         format!("Line {}: invalid 'color' value: {}", parsed.line, e)
                     })?;
-                    config.color = ColorMode::parse(color);
+                    let parsed_color = ColorMode::parse(color).ok_or_else(|| {
+                        format!(
+                            "Line {}: invalid 'color' value '{}'. Use auto, always, or never",
+                            parsed.line, color
+                        )
+                    })?;
+                    config.color = Some(parsed_color);
                 }
                 _ => {
                     return Err(format!("Line {}: unknown key '{}'", parsed.line, key));
@@ -341,6 +347,13 @@ count = 10 # inline comments not supported, this will fail
     #[test]
     fn test_parse_ignore_type_mismatch_rejected() {
         let content = "ignore = [\"ls\", 1]";
+        let config = FileConfig::parse(content);
+        assert!(config.is_err());
+    }
+
+    #[test]
+    fn test_parse_invalid_color_rejected() {
+        let content = "color = \"sometimes\"";
         let config = FileConfig::parse(content);
         assert!(config.is_err());
     }

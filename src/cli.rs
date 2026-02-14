@@ -88,7 +88,7 @@ impl Config {
                 }
                 "-m" => {
                     let value = require_value_argument(&args, &mut i, "-m")?;
-                    cli_overrides.more_than = Some(parse_usize_argument(&value, "-m")?);
+                    cli_overrides.more_than = Some(parse_non_negative_usize_argument(&value, "-m")?);
                 }
                 "-i" => {
                     let value = require_value_argument(&args, &mut i, "-i")?;
@@ -227,6 +227,16 @@ fn parse_usize_argument(arg: &str, flag: &str) -> Result<usize, String> {
         Ok(val) if val > 0 => Ok(val),
         _ => Err(format!(
             "Invalid {} argument, must be a positive integer",
+            flag
+        )),
+    }
+}
+
+fn parse_non_negative_usize_argument(arg: &str, flag: &str) -> Result<usize, String> {
+    match arg.parse::<usize>() {
+        Ok(val) => Ok(val),
+        _ => Err(format!(
+            "Invalid {} argument, must be a non-negative integer",
             flag
         )),
     }
