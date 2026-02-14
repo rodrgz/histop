@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2024"
 description = "Show your most frequently used bash/zsh/fish commands in a visually appealing and easy-to-understand format."
 license = "MIT"
+
+[dependencies]
+ahash = "0.8.12"

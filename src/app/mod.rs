@@ -1,6 +1,6 @@
 //! Application orchestration layer.
 
-use std::collections::HashMap;
+use ahash::AHashMap;
 use std::{cmp, fmt, io};
 
 use crate::output::color::ColorMode;
@@ -68,7 +68,7 @@ pub fn run(config: &RunConfig) -> Result<(), AppError> {
 }
 
 fn filter_and_sort_commands(
-    command_counts: HashMap<String, usize>,
+    command_counts: AHashMap<String, usize>,
     more_than: usize,
 ) -> Vec<RankedCommand> {
     let mut commands: Vec<RankedCommand> = command_counts
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_filter_and_sort_commands() {
-        let mut counts = HashMap::new();
+        let mut counts = AHashMap::default();
         counts.insert("ls".to_string(), 4);
         counts.insert("git".to_string(), 2);
         counts.insert("cd".to_string(), 1);
@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_filter_and_sort_commands_deterministic_tie_break() {
-        let mut counts = HashMap::new();
+        let mut counts = AHashMap::default();
         counts.insert("zsh".to_string(), 2);
         counts.insert("bash".to_string(), 2);
 

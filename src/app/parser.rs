@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use ahash::AHashMap;
 
 use crate::app::AppError;
 use crate::history::{self, HistoryFormat};
@@ -7,7 +7,7 @@ pub(super) fn load_command_counts(
     file: &str,
     ignore: &[String],
     no_hist: bool,
-) -> Result<HashMap<String, usize>, AppError> {
+) -> Result<AHashMap<String, usize>, AppError> {
     let history_format = history::detect_history_format(file).map_err(|source| AppError::HistoryRead {
         parser: "shell",
         path: file.to_string(),

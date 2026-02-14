@@ -8,7 +8,7 @@
 //!     - /some/path
 //! ```
 
-use std::collections::HashMap;
+use ahash::AHashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 
@@ -29,9 +29,9 @@ pub fn count_from_file(
     file_path: &str,
     ignore: &[String],
     no_hist: bool,
-) -> Result<HashMap<String, usize>, std::io::Error> {
+) -> Result<AHashMap<String, usize>, std::io::Error> {
     let metadata = fs::metadata(file_path)?;
-    let mut cmd_count: HashMap<String, usize> = HashMap::with_capacity(256);
+    let mut cmd_count: AHashMap<String, usize> = AHashMap::default();
 
     let mut filtered_commands: Vec<&str> = Vec::with_capacity(ignore.len() + 2);
     if !no_hist {
@@ -54,7 +54,7 @@ pub fn count_from_file(
 
 fn count_from_bytes(
     bytes: &[u8],
-    cmd_count: &mut HashMap<String, usize>,
+    cmd_count: &mut AHashMap<String, usize>,
     filtered_commands: &[&str],
     no_hist: bool,
 ) {
@@ -82,7 +82,7 @@ fn count_from_bytes(
 
 fn count_from_reader<R: BufRead>(
     mut reader: R,
-    cmd_count: &mut HashMap<String, usize>,
+    cmd_count: &mut AHashMap<String, usize>,
     filtered_commands: &[&str],
     no_hist: bool,
 ) -> std::io::Result<()> {
@@ -120,7 +120,7 @@ fn count_from_reader<R: BufRead>(
 fn process_line(
     trimmed_line: &str,
     current_cmd: &mut String,
-    cmd_count: &mut HashMap<String, usize>,
+    cmd_count: &mut AHashMap<String, usize>,
     filtered_commands: &[&str],
     no_hist: bool,
 ) {
@@ -169,7 +169,7 @@ fn trim_line_end(line: &str) -> &str {
 }
 
 fn count_commands(
-    cmd_count: &mut HashMap<String, usize>,
+    cmd_count: &mut AHashMap<String, usize>,
     line: &str,
     filtered_commands: &[&str],
     no_hist: bool,
@@ -195,7 +195,7 @@ fn count_commands(
 }
 
 #[inline]
-fn increment_count(cmd_count: &mut HashMap<String, usize>, first_word: &str) {
+fn increment_count(cmd_count: &mut AHashMap<String, usize>, first_word: &str) {
     if let Some(existing) = cmd_count.get_mut(first_word) {
         *existing += 1;
     } else {
@@ -206,6 +206,7 @@ fn increment_count(cmd_count: &mut HashMap<String, usize>, first_word: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ahash::AHashMap;
 
     #[test]
     fn test_count_simple_commands() {
