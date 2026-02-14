@@ -12,6 +12,11 @@
 pub fn get_first_word<'a>(cmd: &'a str, filtered: &[&str]) -> Option<&'a str> {
     if filtered.is_empty() {
         for w in cmd.split_whitespace() {
+            // Skip end-of-options marker used in wrappers like sudo/doas
+            if w == "--" {
+                continue;
+            }
+
             // Skip environment variable assignments (FOO=bar) but not expansions ($FOO)
             if w.contains('=') && !w.starts_with('$') {
                 continue;
@@ -31,7 +36,7 @@ pub fn get_first_word<'a>(cmd: &'a str, filtered: &[&str]) -> Option<&'a str> {
 
     for w in cmd.split_whitespace() {
         // Skip filtered commands (sudo, doas, etc.)
-        if filtered.contains(&w) {
+        if w == "--" || filtered.contains(&w) {
             continue;
         }
 
@@ -143,6 +148,12 @@ mod tests {
     fn test_get_first_word_preserves_expansion() {
         let filters: Vec<&str> = vec![];
         assert_eq!(get_first_word("$EDITOR file.txt", &filters), Some("$EDITOR"));
+    }
+
+    #[test]
+    fn test_get_first_word_skips_double_dash_after_wrapper() {
+        let filters = vec!["sudo", "doas"];
+        assert_eq!(get_first_word("doas -- systemctl stop sshd", &filters), Some("systemctl"));
     }
 
     #[test]

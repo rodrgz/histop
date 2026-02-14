@@ -78,6 +78,7 @@ mod fish_history {
         let result = histop::history::fish::count_from_file(
             path.to_str().unwrap(),
             &[],
+            false,
         )
         .unwrap();
 
@@ -86,6 +87,7 @@ mod fish_history {
         assert_eq!(result.get("git"), Some(&6));
         assert_eq!(result.get("cargo"), Some(&4));
         assert_eq!(result.get("nvim"), Some(&3));
+        assert_eq!(result.get("apt"), Some(&1)); // sudo apt -> apt
     }
 
     #[test]
@@ -95,6 +97,7 @@ mod fish_history {
         let result = histop::history::fish::count_from_file(
             path.to_str().unwrap(),
             &ignore,
+            false,
         )
         .unwrap();
 

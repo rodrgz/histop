@@ -14,7 +14,7 @@ pub(super) fn load_command_counts(
         source,
     })?;
     match history_format {
-        HistoryFormat::Fish => history::fish::count_from_file(file, ignore).map_err(|source| AppError::HistoryRead {
+        HistoryFormat::Fish => history::fish::count_from_file(file, ignore, no_hist).map_err(|source| AppError::HistoryRead {
             parser: "fish",
             path: file.to_string(),
             source,
