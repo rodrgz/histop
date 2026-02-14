@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::{cmp, fmt, io};
 
-use crate::color::ColorMode;
+use crate::output::color::ColorMode;
 use crate::output::OutputFormat;
 
 mod parser;

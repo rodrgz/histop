@@ -75,7 +75,7 @@ mod fish_history {
     #[test]
     fn test_parse_fish_history() {
         let path = fixtures_path().join("fish_history");
-        let result = histop::fish::count_from_file(
+        let result = histop::history::fish::count_from_file(
             path.to_str().unwrap(),
             &[],
         )
@@ -92,7 +92,7 @@ mod fish_history {
     fn test_fish_with_ignore() {
         let path = fixtures_path().join("fish_history");
         let ignore = vec!["ls".to_string()];
-        let result = histop::fish::count_from_file(
+        let result = histop::history::fish::count_from_file(
             path.to_str().unwrap(),
             &ignore,
         )
@@ -136,7 +136,7 @@ mod output_formats {
 
 mod config {
     use histop::config::FileConfig;
-    use histop::color::ColorMode;
+    use histop::output::color::ColorMode;
 
     #[test]
     fn test_parse_config() {
@@ -155,7 +155,7 @@ ignore = ["ls", "cd"]
 }
 
 mod utils {
-    use histop::utils::{clean_line, get_first_word};
+    use histop::shared::command_parse::{clean_line, get_first_word};
 
     #[test]
     fn test_get_first_word() {

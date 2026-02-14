@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use crate::color::ColorMode;
+use crate::output::color::ColorMode;
 
 /// Configuration loaded from file
 #[derive(Debug, Default)]

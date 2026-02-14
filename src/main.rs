@@ -4,10 +4,13 @@ use std::process;
 
 use histop::app::{self, AppError, RunConfig};
 
-mod cli;
+mod interface;
 
 fn main() {
-    let config = match cli::Config::from_args().map(to_run_config).map_err(AppError::Config) {
+    let config = match interface::cli::Config::from_args()
+        .map(to_run_config)
+        .map_err(AppError::Config)
+    {
         Ok(value) => value,
         Err(err) => {
             eprintln!("Error: {}", err);
@@ -25,7 +28,7 @@ fn main() {
     }
 }
 
-fn to_run_config(config: cli::Config) -> RunConfig {
+fn to_run_config(config: interface::cli::Config) -> RunConfig {
     RunConfig {
         file: config.file,
         count: config.count,

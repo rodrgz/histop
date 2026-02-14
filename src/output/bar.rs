@@ -5,7 +5,7 @@
 
 use std::io::{self, Write};
 
-use crate::color::{Color, Colorizer};
+use crate::output::color::{Color, Colorizer};
 
 /// Configuration for bar rendering
 pub struct BarConfig {
@@ -214,7 +214,7 @@ pub fn print_bars(bars: &[RenderedBar], show_bar: bool, colorizer: &Colorizer) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::color::ColorMode;
+    use crate::output::color::ColorMode;
 
     #[test]
     fn test_render_bars_empty() {

@@ -2,9 +2,9 @@
 
 use std::{env, fs, path::Path, path::PathBuf, process};
 
-use histop::color::ColorMode;
 use histop::config::FileConfig;
 use histop::output::OutputFormat;
+use histop::output::color::ColorMode;
 
 #[derive(Default)]
 struct CliOverrides {

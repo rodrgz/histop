@@ -1,9 +1,9 @@
 use std::io::{self, BufWriter, Write};
 
 use crate::app::{AppError, RankedCommand, RunConfig};
-use crate::bar::{self, BarConfig, BarItem};
-use crate::color::Colorizer;
 use crate::output::{self, CommandEntry, OutputFormat};
+use crate::output::bar::{self, BarConfig, BarItem};
+use crate::output::color::Colorizer;
 
 pub(super) fn write_output(commands: &[RankedCommand], n: usize, config: &RunConfig) -> Result<(), AppError> {
     match config.output_format {

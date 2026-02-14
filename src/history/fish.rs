@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 
-use crate::utils::get_first_word;
+use crate::shared::command_parse::get_first_word;
 
 /// Parse fish_history file and count commands
 ///

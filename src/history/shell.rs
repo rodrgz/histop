@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 
-use crate::utils::{clean_line, get_first_word};
+use crate::shared::command_parse::{clean_line, get_first_word};
 
 /// Count commands from a history file
 ///
