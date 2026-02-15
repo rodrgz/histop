@@ -121,10 +121,10 @@ fn count_commands(
     no_hist: bool,
 ) {
     if no_hist {
-        if let Some(first_word) = line.split_whitespace().next() {
-            if !filtered_commands.contains(first_word) {
-                increment_count(cmd_count, first_word);
-            }
+        if let Some(first_word) = line.split_whitespace().next()
+            && !filtered_commands.contains(first_word)
+        {
+            increment_count(cmd_count, first_word);
         }
         return;
     }
@@ -137,10 +137,8 @@ fn count_commands(
                 increment_count(cmd_count, first_word);
             }
         }
-    } else {
-        if let Some(first_word) = get_first_word(line, filtered_commands) {
-            increment_count(cmd_count, first_word);
-        }
+    } else if let Some(first_word) = get_first_word(line, filtered_commands) {
+        increment_count(cmd_count, first_word);
     }
 }
 

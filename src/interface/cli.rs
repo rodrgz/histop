@@ -160,10 +160,7 @@ impl Config {
         config.apply_cli_overrides(&cli_overrides);
 
         if config.file.is_empty() {
-            config.file = match get_histfile() {
-                Ok(s) => s,
-                Err(e) => return Err(e),
-            };
+            config.file = get_histfile()?;
         }
 
         Ok(config)
@@ -296,12 +293,11 @@ fn get_histfile() -> Result<String, String> {
     if let Ok(parent_shell) = get_parent_shell() {
         push_unique(&mut shell_hints, parent_shell);
     }
-    if let Ok(shell_path) = env::var("SHELL") {
-        if let Some(shell_name) =
+    if let Ok(shell_path) = env::var("SHELL")
+        && let Some(shell_name) =
             Path::new(&shell_path).file_name().and_then(|f| f.to_str())
-        {
-            push_unique(&mut shell_hints, shell_name.to_string());
-        }
+    {
+        push_unique(&mut shell_hints, shell_name.to_string());
     }
 
     let mut candidate_paths: Vec<String> = Vec::new();
