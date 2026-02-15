@@ -71,7 +71,8 @@ fn process_line(
     no_hist: bool,
 ) {
     // Handle zsh extended history format: ": timestamp:0;command"
-    let is_zsh_extended = trimmed_line.starts_with(": ");
+    // specific check for not no_hist, because we want to treat the file as raw if no_hist is true
+    let is_zsh_extended = !no_hist && trimmed_line.starts_with(": ");
     let actual_line = if is_zsh_extended {
         if let Some((_, cmd)) = trimmed_line.split_once(';') {
             cmd
@@ -87,7 +88,7 @@ fn process_line(
     match (
         *skip,
         is_zsh_extended && !trimmed_line.contains(';'),
-        actual_line.ends_with('\\'),
+        !no_hist && actual_line.ends_with('\\'),
     ) {
         (false, false, false) => {
             count_commands(cmd_count, actual_line, filtered_commands, no_hist);
@@ -119,7 +120,16 @@ fn count_commands(
     filtered_commands: &AHashSet<&str>,
     no_hist: bool,
 ) {
-    if line.contains('|') && !no_hist {
+    if no_hist {
+        if let Some(first_word) = line.split_whitespace().next() {
+            if !filtered_commands.contains(first_word) {
+                increment_count(cmd_count, first_word);
+            }
+        }
+        return;
+    }
+
+    if line.contains('|') {
         for subcommand in SplitCommands::new(line) {
             if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
                 increment_count(cmd_count, first_word);

@@ -8,6 +8,14 @@ pub(super) fn load_command_counts(
     ignore: &[String],
     no_hist: bool,
 ) -> Result<AHashMap<String, usize>, AppError> {
+    if no_hist {
+        return history::count_from_file(file, ignore, no_hist).map_err(|source| AppError::HistoryRead {
+            parser: "raw",
+            path: file.to_string(),
+            source,
+        });
+    }
+
     let history_format = history::detect_history_format(file).map_err(|source| AppError::HistoryRead {
         parser: "shell",
         path: file.to_string(),
