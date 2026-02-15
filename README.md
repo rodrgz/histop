@@ -1,9 +1,9 @@
 # histop
 
-<dl>
-  <dt>Linux (x86_64)</dt><dd><a href="https://builds.sr.ht/~rodrgz/histop/commits/main/alpine.yml"><img src="https://builds.sr.ht/~rodrgz/histop/commits/main/alpine.yml.svg" alt="Build status for Linux" /></a></dd>
-  <dt>FreeBSD (x86_64)</dt><dd><a href="https://builds.sr.ht/~rodrgz/histop/commits/main/freebsd.yml"><img src="https://builds.sr.ht/~rodrgz/histop/commits/main/freebsd.yml.svg" alt="Build status for FreeBSD" /></a></dd>
-</dl>
+[![Rust](https://github.com/rodrgz/histop/actions/workflows/rust.yml/badge.svg)](https://github.com/rodrgz/histop/actions/workflows/rust.yml)
+[![Crates.io](https://img.shields.io/crates/v/histop.svg)](https://crates.io/crates/histop)
+[![License](https://img.shields.io/crates/l/histop.svg)](https://github.com/rodrgz/histop/blob/main/LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-blue.svg)](https://github.com/rust-lang/rust)
 
 Uncover the hidden gems of your command history! This nifty program analyzes your shell history file and presents the most frequently used commands in a visually appealing and easy-to-understand format. With powerful options to filter out noise and focus on what matters.
 
@@ -12,7 +12,7 @@ Uncover the hidden gems of your command history! This nifty program analyzes you
 - **Bash** (`~/.bash_history`)
 - **Zsh** (`~/.zsh_history` or `~/.config/zsh/.zsh_history`)
 - **Ash** (`~/.ash_history`)
-- **Fish** (`~/.local/share/fish/fish_history`) — native support!
+- **Fish** (`~/.local/share/fish/fish_history`)
 
 ## Usage
 
@@ -56,14 +56,6 @@ $ histop -c 10 -i "cd"
  219   │░░░░░░░░░░░░░░░░░░░░▓▓▓▓█│  3.53%   man
 ```
 
-## Fish Shell
-
-Fish is now natively supported! Just run `histop` from a Fish shell, or use `-f` to point to your fish_history:
-
-```
-$ histop -f ~/.local/share/fish/fish_history
-```
-
 ## Testing
 
 ### Running All Tests
@@ -73,22 +65,9 @@ cargo test
 ```
 
 This runs all tests:
-- **Unit tests** (47 tests) — test individual functions in each module
-- **Integration tests** (10 tests) — test history parsing with fixture files
-- **CLI tests** (50 tests) — test all command-line options end-to-end
-
-### Running Specific Test Suites
-
-```bash
-# Unit tests only (in src/)
-cargo test --lib
-
-# Integration tests only
-cargo test --test integration_test
-
-# CLI tests only (requires binary to be built first)
-cargo build && cargo test --test cli_test
-```
+- **Unit tests** — test individual functions in each module
+- **Integration tests** — test history parsing with fixture files
+- **CLI tests** — test all command-line options end-to-end
 
 ### Test Fixtures
 
@@ -101,9 +80,3 @@ Test fixtures are located in `tests/fixtures/`:
 
 1. Rust 1.85 or later (edition 2024)
 2. Cargo package manager
-
-## Common Errors
-
-- `Could not determine shell history file`: use `-f <FILE>` explicitly or configure `HISTFILE`.
-- `Missing value for ...`: one of the options requiring a parameter was passed sem valor.
-- `Invalid ... argument`: revise numeric values (`-c` e `-b` require positive integer; `-m` accepts non-negative integer).
