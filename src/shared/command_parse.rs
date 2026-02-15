@@ -1,13 +1,5 @@
 //! Shared utilities for command parsing and processing.
 
-/// Extract the first meaningful word(s) from a command.
-///
-/// # Arguments
-/// * `cmd` - The command string to parse
-/// * `filtered` - Commands to skip (like sudo, doas)
-///
-/// # Returns
-/// The first command word, if one exists
 use ahash::AHashSet;
 
 /// Extract the first meaningful word(s) from a command.
@@ -26,29 +18,45 @@ pub fn get_first_word<'a>(cmd: &'a str, filtered: &AHashSet<&str>) -> Option<&'a
             continue;
         }
 
+        // Handle escaped commands (\ls -> ls) first
+        // Also handle cases like \sudo, \\sudo, reboot\
+        // We trim leading and trailing backslashes
+        let clean_word = w.trim_matches('\\');
+
+        // Handle cases where \ is used as a separator or artifact inside the word
+        // e.g. cd\numount -> cd
+        // e.g. lsblk\\\n -> lsblk (where \n is literal n)
+        // We take the first component before any remaining backslash
+        let first_component = clean_word.split('\\').next().unwrap_or(clean_word);
+        
+        // Handle paths (e.g. ./mvnw -> mvnw, /bin/ls -> ls)
+        // We use rfind instead of Path::new to avoid overhead
+        let command_name = if let Some(idx) = first_component.rfind(std::path::is_separator) {
+            &first_component[idx + 1..]
+        } else {
+            first_component
+        };
+
+        if command_name.is_empty() {
+            continue;
+        }
+
         // Skip filtered commands (sudo, doas, etc.)
-        if filtered.contains(w) {
+        if filtered.contains(command_name) {
             continue;
         }
 
         // Skip environment variable assignments (FOO=bar) but not expansions ($FOO)
-        if !w.starts_with('$') && w.contains('=') {
+        if !command_name.starts_with('$') && command_name.contains('=') {
             continue;
         }
 
-        // Handle escaped commands (\ls -> ls)
-        if let Some(unescaped) = w.strip_prefix('\\') {
-            if unescaped.is_empty() || filtered.contains(unescaped) {
-                continue;
-            }
-            return Some(unescaped);
-        }
-
-        return Some(w);
+        return Some(command_name);
     }
 
     None
 }
+
 
 /// Iterator that splits a command line by pipes `|`, respecting quotes.
 ///
@@ -137,6 +145,47 @@ mod tests {
     fn test_get_first_word_escaped_filtered() {
         let filters = AHashSet::from_iter(vec!["sudo"]);
         assert_eq!(get_first_word("\\sudo apt", &filters), Some("apt"));
+    }
+
+    #[test]
+    fn test_get_first_word_path_normalization() {
+        let filters = AHashSet::new();
+        assert_eq!(get_first_word("./mvnw clean", &filters), Some("mvnw"));
+        assert_eq!(get_first_word("/bin/ls -la", &filters), Some("ls"));
+        assert_eq!(get_first_word("../scripts/deploy.sh", &filters), Some("deploy.sh"));
+        assert_eq!(
+            get_first_word("/nix/store/something/bin/grep", &filters),
+            Some("grep")
+        );
+    }
+
+    #[test]
+    fn test_get_first_word_path_filtered() {
+        let filters = AHashSet::from_iter(vec!["sudo", "grep"]);
+        assert_eq!(get_first_word("/usr/bin/sudo apt", &filters), Some("apt"));
+        // treating "grep" as a wrapper/ignored command means we get the argument
+        assert_eq!(get_first_word("/bin/grep foo", &filters), Some("foo"));
+    }
+
+    #[test]
+    fn test_get_first_word_aggressive_cleaning() {
+        let filters = AHashSet::from_iter(vec!["sudo"]);
+        // \sudo -> sudo (filtered) -> apt
+        assert_eq!(get_first_word("\\sudo apt", &filters), Some("apt"));
+        // \\sudo -> sudo (filtered) -> apt
+        assert_eq!(get_first_word("\\\\sudo apt", &filters), Some("apt"));
+        // reboot\ -> reboot
+        assert_eq!(get_first_word("reboot\\", &filters), Some("reboot"));
+        // lsblk\\\n -> lsblk (assuming \n is literal)
+        assert_eq!(get_first_word("lsblk\\\\\\n", &filters), Some("lsblk"));
+        // cd\numount -> cd
+        assert_eq!(get_first_word("cd\\numount", &filters), Some("cd"));
+        // cd\n -> cd
+        assert_eq!(get_first_word("cd\\n", &filters), Some("cd"));
+        // cd\\\n -> cd
+        assert_eq!(get_first_word("cd\\\\\\n", &filters), Some("cd"));
+        // \nsystemctl -> nsystemctl (trims leading \, then takes nsystemctl)
+        assert_eq!(get_first_word("\\nsystemctl", &filters), Some("nsystemctl"));
     }
 
     #[test]
