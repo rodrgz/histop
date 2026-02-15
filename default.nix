@@ -1,7 +1,7 @@
 { pkgs ? import <nixpkgs> { } }:
-pkgs.rustPlatform.buildRustPackage rec {
+pkgs.rustPlatform.buildRustPackage {
   pname = "histop";
-  version = "0.1";
+  version = "0.2.0";
 
   cargoLock.lockFile = ./Cargo.lock;
 
