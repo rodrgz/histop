@@ -4,7 +4,7 @@ use ahash::{AHashMap, AHashSet};
 use std::fs;
 use std::io::{BufRead, BufReader};
 
-use crate::shared::command_parse::{get_first_word, SplitCommands};
+use crate::shared::command_parse::{SplitCommands, get_first_word};
 
 /// Count commands from a history file
 ///
@@ -19,7 +19,8 @@ pub fn count_from_file(
 
     let mut cmd_count: AHashMap<String, usize> = AHashMap::default();
 
-    let mut filtered_commands: AHashSet<&str> = AHashSet::with_capacity(ignore.len() + 2);
+    let mut filtered_commands: AHashSet<&str> =
+        AHashSet::with_capacity(ignore.len() + 2);
     if !no_hist {
         filtered_commands.insert("sudo");
         filtered_commands.insert("doas");
@@ -34,7 +35,6 @@ pub fn count_from_file(
 
     Ok(cmd_count)
 }
-
 
 fn count_from_reader<R: BufRead>(
     mut reader: R,
@@ -131,7 +131,9 @@ fn count_commands(
 
     if line.contains('|') {
         for subcommand in SplitCommands::new(line) {
-            if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
+            if let Some(first_word) =
+                get_first_word(subcommand, filtered_commands)
+            {
                 increment_count(cmd_count, first_word);
             }
         }
@@ -143,7 +145,10 @@ fn count_commands(
 }
 
 #[inline]
-fn increment_count(cmd_count: &mut AHashMap<String, usize>, first_word: &str) {
+fn increment_count(
+    cmd_count: &mut AHashMap<String, usize>,
+    first_word: &str,
+) {
     if let Some(existing) = cmd_count.get_mut(first_word) {
         *existing += 1;
     } else {

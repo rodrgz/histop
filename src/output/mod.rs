@@ -47,22 +47,22 @@ pub struct CommandEntry {
 }
 
 impl CommandEntry {
-    pub fn new(command: String, count: usize, total: usize) -> Self {
-        let percentage = if total > 0 {
-            (count as f64 / total as f64) * 100.0
-        } else {
-            0.0
-        };
-        Self {
-            command,
-            count,
-            percentage,
-        }
+    pub fn new(
+        command: String,
+        count: usize,
+        total: usize,
+    ) -> Self {
+        let percentage =
+            if total > 0 { (count as f64 / total as f64) * 100.0 } else { 0.0 };
+        Self { command, count, percentage }
     }
 }
 
 /// Convert RenderedBars to CommandEntries for alternative output formats
-pub fn bars_to_entries(bars: &[RenderedBar], total: usize) -> Vec<CommandEntry> {
+pub fn bars_to_entries(
+    bars: &[RenderedBar],
+    total: usize,
+) -> Vec<CommandEntry> {
     bars.iter()
         .map(|bar| {
             let count: usize = bar.count_str.trim().parse().unwrap_or(0);
@@ -108,7 +108,8 @@ mod tests {
 
     #[test]
     fn test_json_escaping() {
-        let entries = vec![CommandEntry::new("echo \"hello\"".to_string(), 1, 1)];
+        let entries =
+            vec![CommandEntry::new("echo \"hello\"".to_string(), 1, 1)];
         let json = format_json(&entries);
         assert!(json.contains("echo \\\"hello\\\""));
     }

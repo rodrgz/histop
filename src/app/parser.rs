@@ -9,31 +9,38 @@ pub(super) fn load_command_counts(
     no_hist: bool,
 ) -> Result<AHashMap<String, usize>, AppError> {
     if no_hist {
-        return history::count_from_file(file, ignore, no_hist).map_err(|source| AppError::HistoryRead {
-            parser: "raw",
-            path: file.to_string(),
-            source,
-        });
+        return history::count_from_file(file, ignore, no_hist).map_err(
+            |source| AppError::HistoryRead {
+                parser: "raw",
+                path: file.to_string(),
+                source,
+            },
+        );
     }
 
-    let history_format = history::detect_history_format(file).map_err(|source| AppError::HistoryRead {
-        parser: "shell",
-        path: file.to_string(),
-        source,
-    })?;
-    match history_format {
-        HistoryFormat::Fish => history::fish::count_from_file(file, ignore, no_hist).map_err(|source| AppError::HistoryRead {
-            parser: "fish",
-            path: file.to_string(),
-            source,
-        }),
-        HistoryFormat::Shell => history::count_from_file(file, ignore, no_hist).map_err(|source| {
+    let history_format =
+        history::detect_history_format(file).map_err(|source| {
             AppError::HistoryRead {
                 parser: "shell",
                 path: file.to_string(),
                 source,
             }
+        })?;
+    match history_format {
+        HistoryFormat::Fish => history::fish::count_from_file(
+            file, ignore, no_hist,
+        )
+        .map_err(|source| AppError::HistoryRead {
+            parser: "fish",
+            path: file.to_string(),
+            source,
         }),
+        HistoryFormat::Shell => history::count_from_file(file, ignore, no_hist)
+            .map_err(|source| AppError::HistoryRead {
+                parser: "shell",
+                path: file.to_string(),
+                source,
+            }),
     }
 }
 
@@ -50,11 +57,14 @@ mod tests {
     }
 
     fn unique_temp_path(prefix: &str) -> PathBuf {
-        let now_nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("{}_{}_{}", prefix, std::process::id(), now_nanos))
+        let now_nanos =
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        std::env::temp_dir().join(format!(
+            "{}_{}_{}",
+            prefix,
+            std::process::id(),
+            now_nanos
+        ))
     }
 
     #[test]
@@ -86,7 +96,8 @@ mod tests {
         writeln!(file, "ls -la").unwrap();
 
         assert_eq!(
-            history::detect_history_format(path_in_fish_dir.to_str().unwrap()).unwrap(),
+            history::detect_history_format(path_in_fish_dir.to_str().unwrap())
+                .unwrap(),
             HistoryFormat::Shell
         );
 

@@ -11,7 +11,10 @@ use ahash::AHashSet;
 /// # Returns
 /// The first command word, if one exists
 #[inline]
-pub fn get_first_word<'a>(cmd: &'a str, filtered: &AHashSet<&str>) -> Option<&'a str> {
+pub fn get_first_word<'a>(
+    cmd: &'a str,
+    filtered: &AHashSet<&str>,
+) -> Option<&'a str> {
     for w in cmd.split_whitespace() {
         // Skip end-of-options marker used in wrappers like sudo/doas
         if w == "--" {
@@ -27,15 +30,17 @@ pub fn get_first_word<'a>(cmd: &'a str, filtered: &AHashSet<&str>) -> Option<&'a
         // e.g. cd\numount -> cd
         // e.g. lsblk\\\n -> lsblk (where \n is literal n)
         // We take the first component before any remaining backslash
-        let first_component = clean_word.split('\\').next().unwrap_or(clean_word);
-        
+        let first_component =
+            clean_word.split('\\').next().unwrap_or(clean_word);
+
         // Handle paths (e.g. ./mvnw -> mvnw, /bin/ls -> ls)
         // We use rfind instead of Path::new to avoid overhead
-        let command_name = if let Some(idx) = first_component.rfind(std::path::is_separator) {
-            &first_component[idx + 1..]
-        } else {
-            first_component
-        };
+        let command_name =
+            if let Some(idx) = first_component.rfind(std::path::is_separator) {
+                &first_component[idx + 1..]
+            } else {
+                first_component
+            };
 
         if command_name.is_empty() {
             continue;
@@ -66,7 +71,6 @@ pub fn get_first_word<'a>(cmd: &'a str, filtered: &AHashSet<&str>) -> Option<&'a
 
     None
 }
-
 
 /// Iterator that splits a command line by pipes `|`, respecting quotes.
 ///
@@ -136,7 +140,10 @@ mod tests {
     #[test]
     fn test_get_first_word_with_doas() {
         let filters = AHashSet::from_iter(vec!["sudo", "doas"]);
-        assert_eq!(get_first_word("doas pacman -S vim", &filters), Some("pacman"));
+        assert_eq!(
+            get_first_word("doas pacman -S vim", &filters),
+            Some("pacman")
+        );
     }
 
     #[test]
@@ -162,7 +169,10 @@ mod tests {
         let filters = AHashSet::new();
         assert_eq!(get_first_word("./mvnw clean", &filters), Some("mvnw"));
         assert_eq!(get_first_word("/bin/ls -la", &filters), Some("ls"));
-        assert_eq!(get_first_word("../scripts/deploy.sh", &filters), Some("deploy.sh"));
+        assert_eq!(
+            get_first_word("../scripts/deploy.sh", &filters),
+            Some("deploy.sh")
+        );
         assert_eq!(
             get_first_word("/nix/store/something/bin/grep", &filters),
             Some("grep")
@@ -195,7 +205,10 @@ mod tests {
         // cd\\\n -> cd
         assert_eq!(get_first_word("cd\\\\\\n", &filters), Some("cd"));
         // \nsystemctl -> nsystemctl (trims leading \, then takes nsystemctl)
-        assert_eq!(get_first_word("\\nsystemctl", &filters), Some("nsystemctl"));
+        assert_eq!(
+            get_first_word("\\nsystemctl", &filters),
+            Some("nsystemctl")
+        );
     }
 
     #[test]
@@ -213,30 +226,33 @@ mod tests {
     #[test]
     fn test_get_first_word_ignores_comments_and_flags() {
         let filters = AHashSet::from_iter(vec!["sudo"]);
-        
+
         // Comment should be ignored if it appears as the command
         assert_eq!(get_first_word("# comment", &filters), None);
         assert_eq!(get_first_word("   #indented comment", &filters), None);
-        
+
         // Flags should be ignored if they appear as the command (e.g. after filtered command)
         assert_eq!(get_first_word("-d", &filters), None);
         assert_eq!(get_first_word("--flag", &filters), None);
-        
-        // sudo -i -> -i is a flag, should be ignored? 
+
+        // sudo -i -> -i is a flag, should be ignored?
         // If the user runs `sudo -i`, we probably want to ignore `-i` and return None or look for next word?
         // Current behavior for `sudo -i` would be `Some("-i")` if not filtered.
         // User says "-d" and "-I" are showing up, likely from things like `sudo -i` or just `-d` on a line?
         // Let's assume we want to skip ANY word starting with `-` at the start of command resolution.
-        assert_eq!(get_first_word("sudo -i", &filters), None); 
-        // Simple parser sees "user" as the next word after skipping -u. 
+        assert_eq!(get_first_word("sudo -i", &filters), None);
+        // Simple parser sees "user" as the next word after skipping -u.
         // This is acceptable as it filters the flag itself.
-        assert_eq!(get_first_word("sudo -u user id", &filters), Some("user")); 
+        assert_eq!(get_first_word("sudo -u user id", &filters), Some("user"));
     }
 
     #[test]
     fn test_get_first_word_skips_double_dash_after_wrapper() {
         let filters = AHashSet::from_iter(vec!["sudo", "doas"]);
-        assert_eq!(get_first_word("doas -- systemctl stop sshd", &filters), Some("systemctl"));
+        assert_eq!(
+            get_first_word("doas -- systemctl stop sshd", &filters),
+            Some("systemctl")
+        );
     }
 
     #[test]
@@ -253,19 +269,22 @@ mod tests {
 
     #[test]
     fn test_split_commands_pipe_in_single_quotes() {
-        let parts: Vec<&str> = SplitCommands::new("echo 'hello | world'").collect();
+        let parts: Vec<&str> =
+            SplitCommands::new("echo 'hello | world'").collect();
         assert_eq!(parts, vec!["echo 'hello | world'"]);
     }
 
     #[test]
     fn test_split_commands_pipe_in_double_quotes() {
-        let parts: Vec<&str> = SplitCommands::new(r#"echo "hello | world""#).collect();
+        let parts: Vec<&str> =
+            SplitCommands::new(r#"echo "hello | world""#).collect();
         assert_eq!(parts, vec![r#"echo "hello | world""#]);
     }
 
     #[test]
     fn test_split_commands_mixed() {
-        let parts: Vec<&str> = SplitCommands::new("echo 'foo | bar' | grep baz").collect();
+        let parts: Vec<&str> =
+            SplitCommands::new("echo 'foo | bar' | grep baz").collect();
         assert_eq!(parts, vec!["echo 'foo | bar' ", " grep baz"]);
     }
 }

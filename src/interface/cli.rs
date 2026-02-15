@@ -81,14 +81,16 @@ impl Config {
                 }
                 "-c" => {
                     let value = require_value_argument(&args, &mut i, "-c")?;
-                    cli_overrides.count = Some(parse_usize_argument(&value, "-c")?);
+                    cli_overrides.count =
+                        Some(parse_usize_argument(&value, "-c")?);
                 }
                 "-a" => {
                     cli_overrides.all = true;
                 }
                 "-m" => {
                     let value = require_value_argument(&args, &mut i, "-m")?;
-                    cli_overrides.more_than = Some(parse_non_negative_usize_argument(&value, "-m")?);
+                    cli_overrides.more_than =
+                        Some(parse_non_negative_usize_argument(&value, "-m")?);
                 }
                 "-i" => {
                     let value = require_value_argument(&args, &mut i, "-i")?;
@@ -101,7 +103,8 @@ impl Config {
                 }
                 "-b" => {
                     let value = require_value_argument(&args, &mut i, "-b")?;
-                    cli_overrides.bar_size = Some(parse_usize_argument(&value, "-b")?);
+                    cli_overrides.bar_size =
+                        Some(parse_usize_argument(&value, "-b")?);
                 }
                 "-n" => {
                     cli_overrides.no_bar = true;
@@ -116,7 +119,8 @@ impl Config {
                     cli_overrides.no_cumu = true;
                 }
                 "-o" | "--output" => {
-                    let value = require_value_argument(&args, &mut i, "-o/--output")?;
+                    let value =
+                        require_value_argument(&args, &mut i, "-o/--output")?;
                     cli_overrides.output_format = Some(
                         OutputFormat::parse(&value).ok_or_else(|| {
                             format!("Invalid output format: {}. Use text, json, or csv", value)
@@ -124,7 +128,8 @@ impl Config {
                     );
                 }
                 "--color" => {
-                    let value = require_value_argument(&args, &mut i, "--color")?;
+                    let value =
+                        require_value_argument(&args, &mut i, "--color")?;
                     cli_overrides.color_mode = Some(
                         ColorMode::parse(&value).ok_or_else(|| {
                             format!("Invalid color mode: {}. Use auto, always, or never", value)
@@ -132,7 +137,8 @@ impl Config {
                     );
                 }
                 "--config" => {
-                    let value = require_value_argument(&args, &mut i, "--config")?;
+                    let value =
+                        require_value_argument(&args, &mut i, "--config")?;
                     cli_overrides.config_path = Some(value);
                 }
                 _ => {
@@ -164,7 +170,10 @@ impl Config {
     }
 
     /// Apply settings from a file config
-    fn apply_file_config(&mut self, file_config: &FileConfig) {
+    fn apply_file_config(
+        &mut self,
+        file_config: &FileConfig,
+    ) {
         if let Some(ref ignore) = file_config.ignore {
             self.ignore = ignore.clone();
         }
@@ -182,7 +191,10 @@ impl Config {
         }
     }
 
-    fn apply_cli_overrides(&mut self, overrides: &CliOverrides) {
+    fn apply_cli_overrides(
+        &mut self,
+        overrides: &CliOverrides,
+    ) {
         if let Some(ref file) = overrides.file {
             self.file = file.clone();
         }
@@ -222,7 +234,10 @@ impl Config {
     }
 }
 
-fn parse_usize_argument(arg: &str, flag: &str) -> Result<usize, String> {
+fn parse_usize_argument(
+    arg: &str,
+    flag: &str,
+) -> Result<usize, String> {
     match arg.parse::<usize>() {
         Ok(val) if val > 0 => Ok(val),
         _ => Err(format!(
@@ -232,7 +247,10 @@ fn parse_usize_argument(arg: &str, flag: &str) -> Result<usize, String> {
     }
 }
 
-fn parse_non_negative_usize_argument(arg: &str, flag: &str) -> Result<usize, String> {
+fn parse_non_negative_usize_argument(
+    arg: &str,
+    flag: &str,
+) -> Result<usize, String> {
     match arg.parse::<usize>() {
         Ok(val) => Ok(val),
         _ => Err(format!(
@@ -242,7 +260,11 @@ fn parse_non_negative_usize_argument(arg: &str, flag: &str) -> Result<usize, Str
     }
 }
 
-fn require_value_argument(args: &[String], i: &mut usize, flag: &str) -> Result<String, String> {
+fn require_value_argument(
+    args: &[String],
+    i: &mut usize,
+    flag: &str,
+) -> Result<String, String> {
     *i += 1;
     if *i >= args.len() {
         return Err(format!("Missing value for {}", flag));
@@ -275,7 +297,9 @@ fn get_histfile() -> Result<String, String> {
         push_unique(&mut shell_hints, parent_shell);
     }
     if let Ok(shell_path) = env::var("SHELL") {
-        if let Some(shell_name) = Path::new(&shell_path).file_name().and_then(|f| f.to_str()) {
+        if let Some(shell_name) =
+            Path::new(&shell_path).file_name().and_then(|f| f.to_str())
+        {
             push_unique(&mut shell_hints, shell_name.to_string());
         }
     }
@@ -307,13 +331,19 @@ fn is_regular_file(path: &str) -> bool {
     fs::metadata(path).map(|meta| meta.is_file()).unwrap_or(false)
 }
 
-fn push_unique(values: &mut Vec<String>, value: String) {
+fn push_unique(
+    values: &mut Vec<String>,
+    value: String,
+) {
     if !values.iter().any(|existing| existing == &value) {
         values.push(value);
     }
 }
 
-fn shell_history_candidates(home: &str, shell: &str) -> Vec<String> {
+fn shell_history_candidates(
+    home: &str,
+    shell: &str,
+) -> Vec<String> {
     match shell {
         "ash" => vec![format!("{}/.ash_history", home)],
         "bash" => vec![format!("{}/.bash_history", home)],
@@ -347,8 +377,9 @@ fn get_parent_shell() -> Result<String, String> {
     let ppid = fields.get(3).ok_or("Invalid /proc/self/stat format")?;
 
     let cmdline_file = PathBuf::from(format!("/proc/{}/cmdline", ppid));
-    let cmdline_contents =
-        fs::read(&cmdline_file).map_err(|e| format!("Failed to read {}: {}", cmdline_file.display(), e))?;
+    let cmdline_contents = fs::read(&cmdline_file).map_err(|e| {
+        format!("Failed to read {}: {}", cmdline_file.display(), e)
+    })?;
     let first_arg = cmdline_contents
         .split(|b| *b == b'\0')
         .next()
@@ -407,7 +438,10 @@ mod tests {
     }
 }
 
-fn print_help_message(count: usize, bar_size: usize) {
+fn print_help_message(
+    count: usize,
+    bar_size: usize,
+) {
     println!(
         "Usage: histop [options]\n\
         \u{A0}-h, --help       Print this help message\n\

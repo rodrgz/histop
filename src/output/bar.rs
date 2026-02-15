@@ -19,11 +19,7 @@ pub struct BarConfig {
 
 impl Default for BarConfig {
     fn default() -> Self {
-        Self {
-            size: 25,
-            show_percentage: true,
-            show_cumulative: true,
-        }
+        Self { size: 25, show_percentage: true, show_cumulative: true }
     }
 }
 
@@ -35,7 +31,10 @@ pub struct BarItem<'a> {
 
 impl<'a> BarItem<'a> {
     #[inline]
-    pub fn new(label: &'a str, value: usize) -> Self {
+    pub fn new(
+        label: &'a str,
+        value: usize,
+    ) -> Self {
         Self { label, value }
     }
 }
@@ -59,7 +58,8 @@ fn render_bar_segment(
 ) -> String {
     let dec = perc / 100.0;
     let inv_cumu_dec = inv_cumu_perc / 100.0;
-    let (mut semifilled_count, mut filled_count, mut unfilled_count) = (0, 0, 0);
+    let (mut semifilled_count, mut filled_count, mut unfilled_count) =
+        (0, 0, 0);
 
     match (show_cumu, show_perc) {
         (true, true) => {
@@ -86,7 +86,9 @@ fn render_bar_segment(
 
     if unfilled_count + semifilled_count + filled_count > 0 {
         // Pre-allocate: 3 bytes for │ chars + characters for bar
-        let mut bar = String::with_capacity(6 + unfilled_count * 3 + semifilled_count * 3 + filled_count * 3);
+        let mut bar = String::with_capacity(
+            6 + unfilled_count * 3 + semifilled_count * 3 + filled_count * 3,
+        );
         bar.push('│');
         for _ in 0..unfilled_count {
             bar.push('░');
@@ -125,11 +127,8 @@ pub fn render_bars<'a>(
     let mut inv_cumu_perc = 100.0;
 
     // Calculate max widths for alignment
-    let max_count_width = items
-        .iter()
-        .map(|i| i.value.to_string().len())
-        .max()
-        .unwrap_or(0);
+    let max_count_width =
+        items.iter().map(|i| i.value.to_string().len()).max().unwrap_or(0);
 
     for item in items {
         let perc = item.value as f32 / total as f32 * 100.0;
@@ -149,7 +148,8 @@ pub fn render_bars<'a>(
             String::new()
         };
 
-        let count_str = format!("{:>width$}", item.value, width = max_count_width);
+        let count_str =
+            format!("{:>width$}", item.value, width = max_count_width);
 
         results.push(RenderedBar {
             count_str,
@@ -174,11 +174,8 @@ pub fn write_bars<W: Write>(
     }
 
     // Calculate max percentage width for alignment
-    let max_perc_width = bars
-        .iter()
-        .map(|b| b.percentage_str.len())
-        .max()
-        .unwrap_or(0);
+    let max_perc_width =
+        bars.iter().map(|b| b.percentage_str.len()).max().unwrap_or(0);
 
     let padding = "   ";
 
@@ -192,7 +189,8 @@ pub fn write_bars<W: Write>(
         }
 
         // Color the percentage
-        let perc_formatted = format!("{:>width$}", bar.percentage_str, width = max_perc_width);
+        let perc_formatted =
+            format!("{:>width$}", bar.percentage_str, width = max_perc_width);
         let perc_display = colorizer.paint(Color::Yellow, &perc_formatted);
 
         // Color the label
@@ -205,7 +203,11 @@ pub fn write_bars<W: Write>(
 
 /// Print rendered bars to stdout with proper alignment and optional colors
 /// (convenience wrapper around write_bars)
-pub fn print_bars(bars: &[RenderedBar], show_bar: bool, colorizer: &Colorizer) {
+pub fn print_bars(
+    bars: &[RenderedBar],
+    show_bar: bool,
+    colorizer: &Colorizer,
+) {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
     let _ = write_bars(&mut handle, bars, show_bar, colorizer);

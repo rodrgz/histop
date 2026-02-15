@@ -99,16 +99,23 @@ pub struct Colorizer {
 impl Colorizer {
     #[inline]
     pub fn new(mode: ColorMode) -> Self {
-        Self {
-            enabled: mode.should_use_color(),
-        }
+        Self { enabled: mode.should_use_color() }
     }
 
     /// Wrap text with color if enabled - returns Cow to avoid allocation when disabled
     #[inline]
-    pub fn paint<'a>(&self, color: Color, text: &'a str) -> Cow<'a, str> {
+    pub fn paint<'a>(
+        &self,
+        color: Color,
+        text: &'a str,
+    ) -> Cow<'a, str> {
         if self.enabled {
-            Cow::Owned(format!("{}{}{}", color.code(), text, Color::Reset.code()))
+            Cow::Owned(format!(
+                "{}{}{}",
+                color.code(),
+                text,
+                Color::Reset.code()
+            ))
         } else {
             Cow::Borrowed(text)
         }

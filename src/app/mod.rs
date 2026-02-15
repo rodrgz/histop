@@ -3,8 +3,8 @@
 use ahash::AHashMap;
 use std::{cmp, fmt, io};
 
-use crate::output::color::ColorMode;
 use crate::output::OutputFormat;
+use crate::output::color::ColorMode;
 
 mod parser;
 mod render;
@@ -12,27 +12,28 @@ mod render;
 #[derive(Debug)]
 pub enum AppError {
     Config(String),
-    HistoryRead {
-        parser: &'static str,
-        path: String,
-        source: io::Error,
-    },
+    HistoryRead { parser: &'static str, path: String, source: io::Error },
     Output(io::Error),
     BrokenPipe,
 }
 
 impl fmt::Display for AppError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         match self {
             Self::Config(msg) => write!(f, "{}", msg),
-            Self::HistoryRead {
-                parser,
-                path,
-                source,
-            } => {
-                write!(f, "Error reading {} history file {}: {}", parser, path, source)
+            Self::HistoryRead { parser, path, source } => {
+                write!(
+                    f,
+                    "Error reading {} history file {}: {}",
+                    parser, path, source
+                )
             }
-            Self::Output(source) => write!(f, "Error writing output: {}", source),
+            Self::Output(source) => {
+                write!(f, "Error writing output: {}", source)
+            }
             Self::BrokenPipe => write!(f, "Broken pipe"),
         }
     }
@@ -61,7 +62,11 @@ pub(crate) struct RankedCommand {
 }
 
 pub fn run(config: &RunConfig) -> Result<(), AppError> {
-    let command_counts = parser::load_command_counts(&config.file, &config.ignore, config.no_hist)?;
+    let command_counts = parser::load_command_counts(
+        &config.file,
+        &config.ignore,
+        config.no_hist,
+    )?;
     let commands = filter_and_sort_commands(command_counts, config.more_than);
     let n = output_limit(commands.len(), config.all, config.count);
     render::write_output(&commands, n, config)
@@ -78,19 +83,17 @@ fn filter_and_sort_commands(
         .collect();
 
     commands.sort_unstable_by(|a, b| {
-        b.count
-            .cmp(&a.count)
-            .then_with(|| a.name.cmp(&b.name))
+        b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name))
     });
     commands
 }
 
-fn output_limit(total_commands: usize, all: bool, count: usize) -> usize {
-    if all {
-        total_commands
-    } else {
-        cmp::min(count, total_commands)
-    }
+fn output_limit(
+    total_commands: usize,
+    all: bool,
+    count: usize,
+) -> usize {
+    if all { total_commands } else { cmp::min(count, total_commands) }
 }
 
 #[cfg(test)]

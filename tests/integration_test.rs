@@ -66,7 +66,6 @@ mod zsh_history {
         assert_eq!(result.get("git"), Some(&6));
         assert_eq!(result.get("cargo"), Some(&4));
     }
-
 }
 
 mod fish_history {
@@ -107,7 +106,7 @@ mod fish_history {
 }
 
 mod output_formats {
-    use histop::output::{format_csv, format_json, CommandEntry};
+    use histop::output::{CommandEntry, format_csv, format_json};
 
     #[test]
     fn test_json_output() {
@@ -153,13 +152,16 @@ ignore = ["ls", "cd"]
         assert_eq!(config.count, Some(15));
         assert_eq!(config.bar_size, Some(30));
         assert_eq!(config.color, Some(ColorMode::Always));
-        assert_eq!(config.ignore, Some(vec!["ls".to_string(), "cd".to_string()]));
+        assert_eq!(
+            config.ignore,
+            Some(vec!["ls".to_string(), "cd".to_string()])
+        );
     }
 }
 
 mod utils {
-    use histop::shared::command_parse::{get_first_word, SplitCommands};
     use ahash::AHashSet;
+    use histop::shared::command_parse::{SplitCommands, get_first_word};
 
     #[test]
     fn test_get_first_word() {
@@ -170,7 +172,8 @@ mod utils {
 
     #[test]
     fn test_split_commands_splits_on_pipes() {
-        let parts: Vec<&str> = SplitCommands::new("cat file | grep pattern | wc -l").collect();
+        let parts: Vec<&str> =
+            SplitCommands::new("cat file | grep pattern | wc -l").collect();
         assert_eq!(parts, vec!["cat file ", " grep pattern ", " wc -l"]);
     }
 }

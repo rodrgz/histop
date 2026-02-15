@@ -34,9 +34,13 @@ pub fn detect_history_format(path: &str) -> Result<HistoryFormat, io::Error> {
         inspected += 1;
         if trimmed.starts_with("- cmd: ") {
             fish_score += 4;
-        } else if trimmed.starts_with("when: ") || trimmed.starts_with("paths:") {
+        } else if trimmed.starts_with("when: ") || trimmed.starts_with("paths:")
+        {
             fish_score += 2;
-        } else if line.starts_with("  when: ") || line.starts_with("  paths: ") || line.starts_with("  - ") {
+        } else if line.starts_with("  when: ")
+            || line.starts_with("  paths: ")
+            || line.starts_with("  - ")
+        {
             fish_score += 1;
         } else if line.starts_with(": ") && line.contains(';') {
             shell_score += 3;

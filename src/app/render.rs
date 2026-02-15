@@ -1,11 +1,15 @@
 use std::io::{self, BufWriter, Write};
 
 use crate::app::{AppError, RankedCommand, RunConfig};
-use crate::output::{self, CommandEntry, OutputFormat};
 use crate::output::bar::{self, BarConfig, BarItem};
 use crate::output::color::Colorizer;
+use crate::output::{self, CommandEntry, OutputFormat};
 
-pub(super) fn write_output(commands: &[RankedCommand], n: usize, config: &RunConfig) -> Result<(), AppError> {
+pub(super) fn write_output(
+    commands: &[RankedCommand],
+    n: usize,
+    config: &RunConfig,
+) -> Result<(), AppError> {
     match config.output_format {
         OutputFormat::Json => write_json_output(commands, n),
         OutputFormat::Csv => write_csv_output(commands, n),
@@ -13,7 +17,10 @@ pub(super) fn write_output(commands: &[RankedCommand], n: usize, config: &RunCon
     }
 }
 
-fn build_command_entries(commands: &[RankedCommand], n: usize) -> Vec<CommandEntry> {
+fn build_command_entries(
+    commands: &[RankedCommand],
+    n: usize,
+) -> Vec<CommandEntry> {
     let total: usize = commands.iter().take(n).map(|entry| entry.count).sum();
 
     commands
@@ -23,17 +30,27 @@ fn build_command_entries(commands: &[RankedCommand], n: usize) -> Vec<CommandEnt
         .collect()
 }
 
-fn write_json_output(commands: &[RankedCommand], n: usize) -> Result<(), AppError> {
+fn write_json_output(
+    commands: &[RankedCommand],
+    n: usize,
+) -> Result<(), AppError> {
     let entries = build_command_entries(commands, n);
     write_stdout(&(output::format_json(&entries) + "\n"))
 }
 
-fn write_csv_output(commands: &[RankedCommand], n: usize) -> Result<(), AppError> {
+fn write_csv_output(
+    commands: &[RankedCommand],
+    n: usize,
+) -> Result<(), AppError> {
     let entries = build_command_entries(commands, n);
     write_stdout(&output::format_csv(&entries))
 }
 
-fn write_text_output(commands: &[RankedCommand], n: usize, config: &RunConfig) -> Result<(), AppError> {
+fn write_text_output(
+    commands: &[RankedCommand],
+    n: usize,
+    config: &RunConfig,
+) -> Result<(), AppError> {
     let items: Vec<BarItem> = commands
         .iter()
         .take(n)
@@ -80,18 +97,9 @@ mod tests {
     #[test]
     fn test_build_command_entries_uses_top_n_total() {
         let commands = vec![
-            RankedCommand {
-                name: "ls".to_string(),
-                count: 6,
-            },
-            RankedCommand {
-                name: "git".to_string(),
-                count: 4,
-            },
-            RankedCommand {
-                name: "cd".to_string(),
-                count: 2,
-            },
+            RankedCommand { name: "ls".to_string(), count: 6 },
+            RankedCommand { name: "git".to_string(), count: 4 },
+            RankedCommand { name: "cd".to_string(), count: 2 },
         ];
 
         let entries = build_command_entries(&commands, 2);

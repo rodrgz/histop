@@ -29,7 +29,11 @@ pub fn format_csv(entries: &[CommandEntry]) -> String {
             entry.command.clone()
         };
 
-        let _ = write!(result, "{},{},{:.2}\n", escaped_cmd, entry.count, entry.percentage);
+        let _ = write!(
+            result,
+            "{},{},{:.2}\n",
+            escaped_cmd, entry.count, entry.percentage
+        );
     }
 
     result

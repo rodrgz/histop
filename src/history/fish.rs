@@ -12,7 +12,7 @@ use ahash::{AHashMap, AHashSet};
 use std::fs;
 use std::io::{BufRead, BufReader};
 
-use crate::shared::command_parse::{get_first_word, SplitCommands};
+use crate::shared::command_parse::{SplitCommands, get_first_word};
 
 /// Parse fish_history file and count commands
 ///
@@ -32,7 +32,8 @@ pub fn count_from_file(
 
     let mut cmd_count: AHashMap<String, usize> = AHashMap::default();
 
-    let mut filtered_commands: AHashSet<&str> = AHashSet::with_capacity(ignore.len() + 2);
+    let mut filtered_commands: AHashSet<&str> =
+        AHashSet::with_capacity(ignore.len() + 2);
     if !no_hist {
         filtered_commands.insert("sudo");
         filtered_commands.insert("doas");
@@ -47,7 +48,6 @@ pub fn count_from_file(
 
     Ok(cmd_count)
 }
-
 
 fn count_from_reader<R: BufRead>(
     mut reader: R,
@@ -145,7 +145,9 @@ fn count_commands(
 ) {
     if line.contains('|') && !no_hist {
         for subcommand in SplitCommands::new(line) {
-            if let Some(first_word) = get_first_word(subcommand, filtered_commands) {
+            if let Some(first_word) =
+                get_first_word(subcommand, filtered_commands)
+            {
                 increment_count(cmd_count, first_word);
             }
         }
@@ -155,7 +157,10 @@ fn count_commands(
 }
 
 #[inline]
-fn increment_count(cmd_count: &mut AHashMap<String, usize>, first_word: &str) {
+fn increment_count(
+    cmd_count: &mut AHashMap<String, usize>,
+    first_word: &str,
+) {
     if let Some(existing) = cmd_count.get_mut(first_word) {
         *existing += 1;
     } else {
@@ -173,10 +178,8 @@ mod tests {
         // Create a temp file with fish history format
         use std::io::Write;
         use std::time::{SystemTime, UNIX_EPOCH};
-        let now_nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let now_nanos =
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let path = std::env::temp_dir().join(format!(
             "test_fish_history_{}_{}",
             std::process::id(),
@@ -190,7 +193,8 @@ mod tests {
         writeln!(file, "- cmd: ls").unwrap();
         writeln!(file, "  when: 1680820393").unwrap();
 
-        let result = count_from_file(path.to_str().unwrap(), &[], false).unwrap();
+        let result =
+            count_from_file(path.to_str().unwrap(), &[], false).unwrap();
         assert_eq!(result.get("ls"), Some(&2));
         assert_eq!(result.get("git"), Some(&1));
 
@@ -201,10 +205,8 @@ mod tests {
     fn test_count_multiline_command_with_doas_wrapper() {
         use std::io::Write;
         use std::time::{SystemTime, UNIX_EPOCH};
-        let now_nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let now_nanos =
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let path = std::env::temp_dir().join(format!(
             "test_fish_multiline_{}_{}",
             std::process::id(),
@@ -215,7 +217,8 @@ mod tests {
         writeln!(file, "  systemctl stop sshd").unwrap();
         writeln!(file, "  when: 1680820391").unwrap();
 
-        let result = count_from_file(path.to_str().unwrap(), &[], false).unwrap();
+        let result =
+            count_from_file(path.to_str().unwrap(), &[], false).unwrap();
         assert_eq!(result.get("systemctl"), Some(&1));
         assert_eq!(result.get("doas"), None);
         assert_eq!(result.get("--"), None);
@@ -227,10 +230,8 @@ mod tests {
     fn test_invalid_utf8_line_is_ignored() {
         use std::io::Write;
         use std::time::{SystemTime, UNIX_EPOCH};
-        let now_nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let now_nanos =
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let path = std::env::temp_dir().join(format!(
             "test_fish_invalid_utf8_{}_{}",
             std::process::id(),
@@ -242,7 +243,8 @@ mod tests {
         file.write_all(b"- cmd: git status\n").unwrap();
         file.write_all(b"  when: 1680820391\n").unwrap();
 
-        let result = count_from_file(path.to_str().unwrap(), &[], false).unwrap();
+        let result =
+            count_from_file(path.to_str().unwrap(), &[], false).unwrap();
         assert_eq!(result.get("ls"), Some(&1));
         assert_eq!(result.get("git"), Some(&1));
 

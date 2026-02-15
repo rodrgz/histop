@@ -31,11 +31,7 @@ impl FileConfig {
         let home = std::env::var("HOME").ok()?;
         let config_path = Path::new(&home).join(".config/histop/config.toml");
 
-        if config_path.exists() {
-            Self::load(&config_path).ok()
-        } else {
-            None
-        }
+        if config_path.exists() { Self::load(&config_path).ok() } else { None }
     }
 
     /// Load configuration from a specific path
@@ -54,32 +50,50 @@ impl FileConfig {
         for (key, parsed) in values {
             match key.as_str() {
                 "ignore" => {
-                    let arr = parse_string_array(&parsed.value).map_err(|e| {
-                        format!("Line {}: invalid 'ignore' value: {}", parsed.line, e)
-                    })?;
+                    let arr =
+                        parse_string_array(&parsed.value).map_err(|e| {
+                            format!(
+                                "Line {}: invalid 'ignore' value: {}",
+                                parsed.line, e
+                            )
+                        })?;
                     config.ignore = Some(arr);
                 }
                 "bar_size" => {
                     let n = parse_integer(&parsed.value).map_err(|e| {
-                        format!("Line {}: invalid 'bar_size' value: {}", parsed.line, e)
+                        format!(
+                            "Line {}: invalid 'bar_size' value: {}",
+                            parsed.line, e
+                        )
                     })?;
-                    config.bar_size = Some(parse_positive_integer(n, "bar_size")?);
+                    config.bar_size =
+                        Some(parse_positive_integer(n, "bar_size")?);
                 }
                 "count" => {
                     let n = parse_integer(&parsed.value).map_err(|e| {
-                        format!("Line {}: invalid 'count' value: {}", parsed.line, e)
+                        format!(
+                            "Line {}: invalid 'count' value: {}",
+                            parsed.line, e
+                        )
                     })?;
                     config.count = Some(parse_positive_integer(n, "count")?);
                 }
                 "more_than" => {
                     let n = parse_integer(&parsed.value).map_err(|e| {
-                        format!("Line {}: invalid 'more_than' value: {}", parsed.line, e)
+                        format!(
+                            "Line {}: invalid 'more_than' value: {}",
+                            parsed.line, e
+                        )
                     })?;
-                    config.more_than = Some(parse_non_negative_integer(n, "more_than")?);
+                    config.more_than =
+                        Some(parse_non_negative_integer(n, "more_than")?);
                 }
                 "color" => {
                     let color = parse_string(&parsed.value).map_err(|e| {
-                        format!("Line {}: invalid 'color' value: {}", parsed.line, e)
+                        format!(
+                            "Line {}: invalid 'color' value: {}",
+                            parsed.line, e
+                        )
                     })?;
                     let parsed_color = ColorMode::parse(color).ok_or_else(|| {
                         format!(
@@ -90,7 +104,10 @@ impl FileConfig {
                     config.color = Some(parsed_color);
                 }
                 _ => {
-                    return Err(format!("Line {}: unknown key '{}'", parsed.line, key));
+                    return Err(format!(
+                        "Line {}: unknown key '{}'",
+                        parsed.line, key
+                    ));
                 }
             }
         }
@@ -140,10 +157,7 @@ fn parse_toml(content: &str) -> Result<HashMap<String, ParsedValue>, String> {
 
             values.insert(
                 key.to_string(),
-                ParsedValue {
-                    value,
-                    line: line_num + 1,
-                },
+                ParsedValue { value, line: line_num + 1 },
             );
         }
     }
@@ -156,7 +170,9 @@ fn parse_value(s: &str) -> Result<Value, String> {
     let s = s.trim();
 
     // String (quoted)
-    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+    if (s.starts_with('"') && s.ends_with('"'))
+        || (s.starts_with('\'') && s.ends_with('\''))
+    {
         let inner = &s[1..s.len() - 1];
         return Ok(Value::String(inner.to_string()));
     }
@@ -240,14 +256,20 @@ fn value_type(value: &Value) -> &'static str {
     }
 }
 
-fn parse_positive_integer(value: i64, key: &str) -> Result<usize, String> {
+fn parse_positive_integer(
+    value: i64,
+    key: &str,
+) -> Result<usize, String> {
     if value <= 0 {
         return Err(format!("{} must be a positive integer", key));
     }
     usize::try_from(value).map_err(|_| format!("{} is too large", key))
 }
 
-fn parse_non_negative_integer(value: i64, key: &str) -> Result<usize, String> {
+fn parse_non_negative_integer(
+    value: i64,
+    key: &str,
+) -> Result<usize, String> {
     if value < 0 {
         return Err(format!("{} must be a non-negative integer", key));
     }
