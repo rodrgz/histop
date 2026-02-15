@@ -159,10 +159,12 @@ ignore = ["ls", "cd"]
 
 mod utils {
     use histop::shared::command_parse::{get_first_word, SplitCommands};
+    use ahash::AHashSet;
 
     #[test]
     fn test_get_first_word() {
-        let result = get_first_word("git status --short", &[]);
+        let filters = AHashSet::new();
+        let result = get_first_word("git status --short", &filters);
         assert_eq!(result, Some("git"));
     }
 

@@ -8,7 +8,7 @@
 //!     - /some/path
 //! ```
 
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use std::fs;
 use std::io::{BufRead, BufReader};
 
@@ -22,68 +22,37 @@ use crate::shared::command_parse::{get_first_word, SplitCommands};
 ///
 /// # Returns
 /// A HashMap of command -> count
-const MAX_IN_MEMORY_SIZE: u64 = 100 * 1024 * 1024; // 100MB
-
-/// Parse fish_history file and count commands
 pub fn count_from_file(
     file_path: &str,
     ignore: &[String],
     no_hist: bool,
 ) -> Result<AHashMap<String, usize>, std::io::Error> {
-    let metadata = fs::metadata(file_path)?;
+    // 256KB buffer size
+    const BUFFER_SIZE: usize = 256 * 1024;
+
     let mut cmd_count: AHashMap<String, usize> = AHashMap::default();
 
-    let mut filtered_commands: Vec<&str> = Vec::with_capacity(ignore.len() + 2);
+    let mut filtered_commands: AHashSet<&str> = AHashSet::with_capacity(ignore.len() + 2);
     if !no_hist {
-        filtered_commands.extend(["sudo", "doas"]);
+        filtered_commands.insert("sudo");
+        filtered_commands.insert("doas");
     }
-    let ignore_refs: Vec<&str> = ignore.iter().map(|s| s.as_str()).collect();
-    filtered_commands.extend(ignore_refs);
+    for s in ignore {
+        filtered_commands.insert(s.as_str());
+    }
 
-    if metadata.len() < MAX_IN_MEMORY_SIZE {
-        let bytes = fs::read(file_path)?;
-        count_from_bytes(&bytes, &mut cmd_count, &filtered_commands, no_hist);
-    } else {
-        let file = fs::File::open(file_path)?;
-        let reader = BufReader::new(file);
-        count_from_reader(reader, &mut cmd_count, &filtered_commands, no_hist)?;
-    }
+    let file = fs::File::open(file_path)?;
+    let reader = BufReader::with_capacity(BUFFER_SIZE, file);
+    count_from_reader(reader, &mut cmd_count, &filtered_commands, no_hist)?;
 
     Ok(cmd_count)
 }
 
-fn count_from_bytes(
-    bytes: &[u8],
-    cmd_count: &mut AHashMap<String, usize>,
-    filtered_commands: &[&str],
-    no_hist: bool,
-) {
-    let mut current_cmd = String::with_capacity(256);
-
-    for line_bytes in bytes.split(|&b| b == b'\n') {
-        let line = match std::str::from_utf8(line_bytes) {
-            Ok(s) => trim_line_end(s),
-            Err(_) => continue,
-        };
-
-        process_line(
-            line,
-            &mut current_cmd,
-            cmd_count,
-            filtered_commands,
-            no_hist,
-        );
-    }
-
-    if !current_cmd.is_empty() {
-        count_commands(cmd_count, &current_cmd, filtered_commands, no_hist);
-    }
-}
 
 fn count_from_reader<R: BufRead>(
     mut reader: R,
     cmd_count: &mut AHashMap<String, usize>,
-    filtered_commands: &[&str],
+    filtered_commands: &AHashSet<&str>,
     no_hist: bool,
 ) -> std::io::Result<()> {
     let mut current_cmd = String::with_capacity(256);
@@ -121,7 +90,7 @@ fn process_line(
     trimmed_line: &str,
     current_cmd: &mut String,
     cmd_count: &mut AHashMap<String, usize>,
-    filtered_commands: &[&str],
+    filtered_commands: &AHashSet<&str>,
     no_hist: bool,
 ) {
     // Fish history command lines start with "- cmd: "
@@ -171,7 +140,7 @@ fn trim_line_end(line: &str) -> &str {
 fn count_commands(
     cmd_count: &mut AHashMap<String, usize>,
     line: &str,
-    filtered_commands: &[&str],
+    filtered_commands: &AHashSet<&str>,
     no_hist: bool,
 ) {
     if line.contains('|') && !no_hist {

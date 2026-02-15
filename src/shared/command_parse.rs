@@ -8,46 +8,37 @@
 ///
 /// # Returns
 /// The first command word, if one exists
+use ahash::AHashSet;
+
+/// Extract the first meaningful word(s) from a command.
+///
+/// # Arguments
+/// * `cmd` - The command string to parse
+/// * `filtered` - Set of commands to skip (like sudo, doas)
+///
+/// # Returns
+/// The first command word, if one exists
 #[inline]
-pub fn get_first_word<'a>(cmd: &'a str, filtered: &[&str]) -> Option<&'a str> {
-    if filtered.is_empty() {
-        for w in cmd.split_whitespace() {
-            // Skip end-of-options marker used in wrappers like sudo/doas
-            if w == "--" {
-                continue;
-            }
-
-            // Skip environment variable assignments (FOO=bar) but not expansions ($FOO)
-            if w.contains('=') && !w.starts_with('$') {
-                continue;
-            }
-
-            if let Some(unescaped) = w.strip_prefix('\\') {
-                if !unescaped.is_empty() {
-                    return Some(unescaped);
-                }
-                continue;
-            }
-
-            return Some(w);
-        }
-        return None;
-    }
-
+pub fn get_first_word<'a>(cmd: &'a str, filtered: &AHashSet<&str>) -> Option<&'a str> {
     for w in cmd.split_whitespace() {
+        // Skip end-of-options marker used in wrappers like sudo/doas
+        if w == "--" {
+            continue;
+        }
+
         // Skip filtered commands (sudo, doas, etc.)
-        if w == "--" || filtered.contains(&w) {
+        if filtered.contains(w) {
             continue;
         }
 
         // Skip environment variable assignments (FOO=bar) but not expansions ($FOO)
-        if w.contains('=') && !w.starts_with('$') {
+        if !w.starts_with('$') && w.contains('=') {
             continue;
         }
 
         // Handle escaped commands (\ls -> ls)
         if let Some(unescaped) = w.strip_prefix('\\') {
-            if unescaped.is_empty() || filtered.contains(&unescaped) {
+            if unescaped.is_empty() || filtered.contains(unescaped) {
                 continue;
             }
             return Some(unescaped);
@@ -114,61 +105,61 @@ mod tests {
 
     #[test]
     fn test_get_first_word_simple() {
-        let filters = vec!["sudo", "doas"];
+        let filters = AHashSet::from_iter(vec!["sudo", "doas"]);
         assert_eq!(get_first_word("ls -la", &filters), Some("ls"));
     }
 
     #[test]
     fn test_get_first_word_with_sudo() {
-        let filters = vec!["sudo", "doas"];
+        let filters = AHashSet::from_iter(vec!["sudo", "doas"]);
         assert_eq!(get_first_word("sudo apt update", &filters), Some("apt"));
     }
 
     #[test]
     fn test_get_first_word_with_doas() {
-        let filters = vec!["sudo", "doas"];
+        let filters = AHashSet::from_iter(vec!["sudo", "doas"]);
         assert_eq!(get_first_word("doas pacman -S vim", &filters), Some("pacman"));
     }
 
     #[test]
     fn test_get_first_word_env_var_prefix() {
-        let filters = vec![];
+        let filters = AHashSet::new();
         assert_eq!(get_first_word("FOO=bar cmd arg", &filters), Some("cmd"));
     }
 
     #[test]
     fn test_get_first_word_escaped_command() {
-        let filters = vec![];
+        let filters = AHashSet::new();
         assert_eq!(get_first_word("\\ls -la", &filters), Some("ls"));
     }
 
     #[test]
     fn test_get_first_word_escaped_filtered() {
-        let filters = vec!["sudo"];
+        let filters = AHashSet::from_iter(vec!["sudo"]);
         assert_eq!(get_first_word("\\sudo apt", &filters), Some("apt"));
     }
 
     #[test]
     fn test_get_first_word_empty() {
-        let filters: Vec<&str> = vec![];
+        let filters = AHashSet::new();
         assert_eq!(get_first_word("", &filters), None);
     }
 
     #[test]
     fn test_get_first_word_whitespace_only() {
-        let filters: Vec<&str> = vec![];
+        let filters = AHashSet::new();
         assert_eq!(get_first_word("   ", &filters), None);
     }
 
     #[test]
     fn test_get_first_word_preserves_expansion() {
-        let filters: Vec<&str> = vec![];
+        let filters = AHashSet::new();
         assert_eq!(get_first_word("$EDITOR file.txt", &filters), Some("$EDITOR"));
     }
 
     #[test]
     fn test_get_first_word_skips_double_dash_after_wrapper() {
-        let filters = vec!["sudo", "doas"];
+        let filters = AHashSet::from_iter(vec!["sudo", "doas"]);
         assert_eq!(get_first_word("doas -- systemctl stop sshd", &filters), Some("systemctl"));
     }
 
