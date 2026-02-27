@@ -171,7 +171,6 @@ fn increment_count(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ahash::AHashMap;
 
     #[test]
     fn test_count_simple_commands() {

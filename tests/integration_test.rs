@@ -105,6 +105,24 @@ mod fish_history {
     }
 }
 
+mod tcsh_history {
+    use super::*;
+
+    #[test]
+    fn test_parse_tcsh_history() {
+        let path = fixtures_path().join("tcsh_history");
+        let result = histop::history::tcsh::count_from_file(
+            path.to_str().unwrap(),
+            &[],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(result.get("ls"), Some(&2));
+        assert_eq!(result.get("git"), Some(&1));
+    }
+}
+
 mod output_formats {
     use histop::output::{CommandEntry, format_csv, format_json};
 

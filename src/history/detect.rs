@@ -5,14 +5,22 @@ use std::io::{self, BufRead, BufReader};
 pub enum HistoryFormat {
     Shell,
     Fish,
+    PowerShell,
+    Tcsh,
 }
 
 pub fn detect_history_format(path: &str) -> Result<HistoryFormat, io::Error> {
+    // PowerShell usually uses "ConsoleHost_history.txt".
+    if path.ends_with("ConsoleHost_history.txt") {
+        return Ok(HistoryFormat::PowerShell);
+    }
+
     let file = fs::File::open(path)?;
     let reader = BufReader::new(file);
 
     let mut fish_score = 0_u32;
     let mut shell_score = 0_u32;
+    let mut tcsh_score = 0_u32;
     let mut inspected = 0_u32;
 
     for line_result in reader.lines() {
@@ -44,6 +52,11 @@ pub fn detect_history_format(path: &str) -> Result<HistoryFormat, io::Error> {
             fish_score += 1;
         } else if line.starts_with(": ") && line.contains(';') {
             shell_score += 3;
+        } else if line.starts_with("#+")
+            && line.len() > 2
+            && line[2..].chars().all(char::is_numeric)
+        {
+            tcsh_score += 5;
         } else {
             shell_score += 1;
         }
@@ -53,8 +66,10 @@ pub fn detect_history_format(path: &str) -> Result<HistoryFormat, io::Error> {
         }
     }
 
-    if fish_score > shell_score {
+    if fish_score > shell_score && fish_score > tcsh_score {
         Ok(HistoryFormat::Fish)
+    } else if tcsh_score > shell_score && tcsh_score > fish_score {
+        Ok(HistoryFormat::Tcsh)
     } else {
         Ok(HistoryFormat::Shell)
     }

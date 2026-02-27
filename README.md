@@ -11,8 +11,10 @@ Uncover the hidden gems of your command history! This nifty program analyzes you
 
 - **Bash** (`~/.bash_history`)
 - **Zsh** (`~/.zsh_history` or `~/.config/zsh/.zsh_history`)
-- **Ash** (`~/.ash_history`)
 - **Fish** (`~/.local/share/fish/fish_history`)
+- **PowerShell** (`~/.local/share/powershell/PSReadLine/ConsoleHost_history.txt`)
+- **Tcsh** (`~/.history`, `~/.tcsh_history`, `~/.csh_history`)
+- **Ash** (`~/.ash_history`)
 
 ## Usage
 

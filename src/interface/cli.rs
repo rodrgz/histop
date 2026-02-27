@@ -118,9 +118,8 @@ impl Config {
                 "-nc" => {
                     cli_overrides.no_cumu = true;
                 }
-                "-o" | "--output" => {
-                    let value =
-                        require_value_argument(&args, &mut i, "-o/--output")?;
+                "-o" => {
+                    let value = require_value_argument(&args, &mut i, "-o")?;
                     cli_overrides.output_format = Some(
                         OutputFormat::parse(&value).ok_or_else(|| {
                             format!("Invalid output format: {}. Use text, json, or csv", value)
@@ -348,6 +347,15 @@ fn shell_history_candidates(
             format!("{}/.config/zsh/.zsh_history", home),
             format!("{}/.zsh_history", home),
         ],
+        "pwsh" => vec![format!(
+            "{}/.local/share/powershell/PSReadLine/ConsoleHost_history.txt",
+            home
+        )],
+        "tcsh" | "csh" => vec![
+            format!("{}/.history", home),
+            format!("{}/.csh_history", home),
+            format!("{}/.tcsh_history", home),
+        ],
         _ => Vec::new(),
     }
 }
@@ -359,6 +367,11 @@ fn default_history_candidates(home: &str) -> Vec<String> {
         format!("{}/.config/zsh/.zsh_history", home),
         format!("{}/.ash_history", home),
         format!("{}/.local/share/fish/fish_history", home),
+        format!(
+            "{}/.local/share/powershell/PSReadLine/ConsoleHost_history.txt",
+            home
+        ),
+        format!("{}/.history", home),
     ]
 }
 
@@ -418,11 +431,34 @@ mod tests {
     }
 
     #[test]
+    fn test_shell_history_candidates_powershell() {
+        let candidates = shell_history_candidates("/tmp/home", "pwsh");
+        assert_eq!(candidates.len(), 1);
+        assert!(
+            candidates[0]
+                .ends_with("powershell/PSReadLine/ConsoleHost_history.txt")
+        );
+    }
+
+    #[test]
+    fn test_shell_history_candidates_tcsh() {
+        let candidates = shell_history_candidates("/tmp/home", "tcsh");
+        assert_eq!(candidates.len(), 3);
+        assert!(candidates.iter().any(|c| c.ends_with("/.history")));
+        assert!(candidates.iter().any(|c| c.ends_with("/.csh_history")));
+        assert!(candidates.iter().any(|c| c.ends_with("/.tcsh_history")));
+    }
+
+    #[test]
     fn test_default_history_candidates_contains_common_shells() {
         let candidates = default_history_candidates("/tmp/home");
         assert!(candidates.iter().any(|c| c.ends_with(".bash_history")));
         assert!(candidates.iter().any(|c| c.ends_with(".zsh_history")));
         assert!(candidates.iter().any(|c| c.ends_with("fish_history")));
+        assert!(candidates.iter().any(|c| {
+            c.ends_with("powershell/PSReadLine/ConsoleHost_history.txt")
+        }));
+        assert!(candidates.iter().any(|c| c.ends_with("/.history")));
     }
 
     #[test]
@@ -451,7 +487,7 @@ fn print_help_message(
         \u{A0}-nh              Disable history mode (can be used for any data)\n\
         \u{A0}-np              Do not print the percentage in the bar\n\
         \u{A0}-nc              Do not print the inverse cumulative percentage in the bar\n\
-        \u{A0}-o, --output <FMT> Output format: text (default), json, csv\n\
+        \u{A0}-o <FMT>         Output format: text (default), json, csv\n\
         \u{A0}--color <WHEN>   Color output: auto (default), always, never\n\
         \u{A0}--config <PATH>  Path to config file\n\
         \u{A0}██               Percentage\n\

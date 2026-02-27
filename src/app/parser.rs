@@ -41,6 +41,22 @@ pub(super) fn load_command_counts(
                 path: file.to_string(),
                 source,
             }),
+        HistoryFormat::PowerShell => history::powershell::count_from_file(
+            file, ignore, no_hist,
+        )
+        .map_err(|source| AppError::HistoryRead {
+            parser: "powershell",
+            path: file.to_string(),
+            source,
+        }),
+        HistoryFormat::Tcsh => history::tcsh::count_from_file(
+            file, ignore, no_hist,
+        )
+        .map_err(|source| AppError::HistoryRead {
+            parser: "tcsh",
+            path: file.to_string(),
+            source,
+        }),
     }
 }
 
@@ -83,6 +99,33 @@ mod tests {
             history::detect_history_format(path.to_str().unwrap()).unwrap(),
             HistoryFormat::Shell
         );
+    }
+
+    #[test]
+    fn test_detect_history_format_tcsh_fixture() {
+        let path = fixtures_path().join("tcsh_history");
+        assert_eq!(
+            history::detect_history_format(path.to_str().unwrap()).unwrap(),
+            HistoryFormat::Tcsh
+        );
+    }
+
+    #[test]
+    fn test_detect_history_format_powershell_filename() {
+        let base = unique_temp_path("powershell_history_detection");
+        fs::create_dir_all(&base).unwrap();
+        let path = base.join("ConsoleHost_history.txt");
+        let mut file = fs::File::create(&path).unwrap();
+        writeln!(file, "git status").unwrap();
+        writeln!(file, "ls -la").unwrap();
+
+        assert_eq!(
+            history::detect_history_format(path.to_str().unwrap()).unwrap(),
+            HistoryFormat::PowerShell
+        );
+
+        fs::remove_file(path).ok();
+        fs::remove_dir_all(base).ok();
     }
 
     #[test]

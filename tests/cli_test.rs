@@ -62,7 +62,7 @@ mod help_flag {
         assert!(stdout.contains("-nh"));
         assert!(stdout.contains("-np"));
         assert!(stdout.contains("-nc"));
-        assert!(stdout.contains("-o, --output"));
+        assert!(stdout.contains("-o <FMT>"));
         assert!(stdout.contains("--color"));
         assert!(stdout.contains("--config"));
     }
@@ -410,7 +410,7 @@ mod output_format_flag {
     }
 
     #[test]
-    fn test_output_json_long() {
+    fn test_output_long_option_is_rejected() {
         let path = fixtures_path().join("bash_history");
         let output = run_histop(&[
             "-f",
@@ -420,10 +420,9 @@ mod output_format_flag {
             "-c",
             "3",
         ]);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        assert!(output.status.success());
-        assert!(stdout.contains("\"command\":"));
+        assert!(!output.status.success());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("Invalid option"));
     }
 
     #[test]
