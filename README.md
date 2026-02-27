@@ -5,16 +5,16 @@
 [![License](https://img.shields.io/crates/l/histop.svg)](https://github.com/rodrgz/histop/blob/main/LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-blue.svg)](https://github.com/rust-lang/rust)
 
-Uncover the hidden gems of your command history! This nifty program analyzes your shell history file and presents the most frequently used commands in a visually appealing and easy-to-understand format. With powerful options to filter out noise and focus on what matters.
+Uncover the hidden gems of your command history! This program analyzes your shell history file and presents the most frequently used commands in a visually appealing and easy-to-understand format. With powerful options to filter out noise and focus on what matters.
 
 ## Supported Shells
 
+- **Ash** (`~/.ash_history`)
 - **Bash** (`~/.bash_history`)
-- **Zsh** (`~/.zsh_history` or `~/.config/zsh/.zsh_history`)
 - **Fish** (`~/.local/share/fish/fish_history`)
 - **PowerShell** (`~/.local/share/powershell/PSReadLine/ConsoleHost_history.txt`)
 - **Tcsh** (`~/.history`, `~/.tcsh_history`, `~/.csh_history`)
-- **Ash** (`~/.ash_history`)
+- **Zsh** (`~/.zsh_history` or `~/.config/zsh/.zsh_history`)
 
 ## Usage
 
@@ -27,19 +27,22 @@ cargo build #or nix build
 ```
 $ histop -h 
 Usage: histop [options] [FILE]
- -h, --help       Print this help message
- -f <FILE>        Path to the history file (or pass FILE as positional argument)
- -c <COUNT>       Number of commands to print (default: 25)
- -a               Print all commands (overrides -c)
- -m <MORE_THAN>   Only consider commands used more than <MORE_THAN> times
- -i <IGNORE>      Ignore specified commands (e.g. "ls|grep|nvim")
- -b <BAR_SIZE>    Size of the bar graph (default: 25)
- -n               Do not print the bar
- -nh              Disable history mode (can be used for any data; reads stdin when piped)
- -np              Do not print the percentage in the bar
- -nc              Do not print the inverse cumulative percentage in the bar
- ██               Percentage
- ▓▓               Inverse cumulative percentage
+ -h, --help       Print this help message
+ -f <FILE>        Path to the history file (or pass FILE positionally)
+ -c <COUNT>       Number of commands to print (default: 25)
+ -a               Print all commands (overrides -c)
+ -m <MORE_THAN>   Only consider commands used more than <MORE_THAN> times
+ -i <IGNORE>      Ignore specified commands (e.g. "ls|grep|nvim")
+ -b <BAR_SIZE>    Size of the bar graph (default: 25)
+ -n               Do not print the bar
+ -nh              Disable history mode (can be used for any data)
+ -np              Do not print the percentage in the bar
+ -nc              Do not print the inverse cumulative percentage in the bar
+ -o <FMT>         Output format: text (default), json, csv
+ --color <WHEN>   Color output: auto (default), always, never
+ --config <PATH>  Path to config file
+ ██               Percentage
+ ▓▓               Inverse cumulative percentage
 ```
 
 ## Using `-nh` with stdin
@@ -70,26 +73,6 @@ $ histop -c 10 -i "cd"
  233   │░░░░░░░░░░░░░░░░░░░▓▓▓▓▓█│  3.75%   cargo
  219   │░░░░░░░░░░░░░░░░░░░░▓▓▓▓█│  3.53%   man
 ```
-
-## Testing
-
-### Running All Tests
-
-```bash
-cargo test
-```
-
-This runs all tests:
-- **Unit tests** — test individual functions in each module
-- **Integration tests** — test history parsing with fixture files
-- **CLI tests** — test all command-line options end-to-end
-
-### Test Fixtures
-
-Test fixtures are located in `tests/fixtures/`:
-- `bash_history` — sample bash history file
-- `zsh_history` — sample zsh extended history file  
-- `fish_history` — sample fish history file (YAML format)
 
 ## Requirements
 
