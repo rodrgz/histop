@@ -35,7 +35,7 @@ Usage: histop [options] [FILE]
  -i <IGNORE>      Ignore specified commands (e.g. "ls|grep|nvim")
  -b <BAR_SIZE>    Size of the bar graph (default: 25)
  -n               Do not print the bar
- -nh              Disable history mode (can be used for any data)
+ -nh              Disable history mode (requires FILE or piped/redirected stdin)
  -np              Do not print the percentage in the bar
  -nc              Do not print the inverse cumulative percentage in the bar
  -o <FMT>         Output format: text (default), json, csv
@@ -55,8 +55,8 @@ histop -nh < arquivo.txt
 cat arquivo.txt | histop -nh
 ```
 
-If `stdin` is a terminal (not piped), `histop` falls back to shell history
-detection as usual.
+If `stdin` is a terminal (not piped) and no `FILE` is provided, `histop`
+returns an error and asks for either piped/redirected input or a file path.
 
 ## Example
 

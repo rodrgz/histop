@@ -6,6 +6,9 @@ use histop::config::FileConfig;
 use histop::output::OutputFormat;
 use histop::output::color::ColorMode;
 
+const NO_HIST_INPUT_ERROR: &str = "When using -nh without FILE, provide input through stdin (pipe or \
+     redirection), or pass FILE with -f/positional argument";
+
 #[derive(Default)]
 struct CliOverrides {
     file: Option<String>,
@@ -172,9 +175,9 @@ impl Config {
         config.apply_cli_overrides(&cli_overrides);
 
         if config.file.is_empty() {
-            if should_read_stdin(config.no_hist, std::io::stdin().is_terminal())
-            {
-                config.file = "-".to_string();
+            let stdin_is_terminal = std::io::stdin().is_terminal();
+            if config.no_hist {
+                config.file = resolve_no_hist_input(stdin_is_terminal)?;
             } else {
                 config.file = get_histfile()?;
             }
@@ -253,6 +256,14 @@ fn should_read_stdin(
     stdin_is_terminal: bool,
 ) -> bool {
     no_hist && !stdin_is_terminal
+}
+
+fn resolve_no_hist_input(stdin_is_terminal: bool) -> Result<String, String> {
+    if should_read_stdin(true, stdin_is_terminal) {
+        Ok("-".to_string())
+    } else {
+        Err(NO_HIST_INPUT_ERROR.to_string())
+    }
 }
 
 fn parse_usize_argument(
@@ -508,6 +519,18 @@ mod tests {
     fn test_should_not_read_stdin_when_stdin_is_terminal() {
         assert!(!should_read_stdin(true, true));
     }
+
+    #[test]
+    fn test_resolve_no_hist_input_uses_stdin_when_not_terminal() {
+        let file = resolve_no_hist_input(false).unwrap();
+        assert_eq!(file, "-");
+    }
+
+    #[test]
+    fn test_resolve_no_hist_input_requires_stdin_or_file_on_terminal() {
+        let err = resolve_no_hist_input(true).unwrap_err();
+        assert_eq!(err, NO_HIST_INPUT_ERROR);
+    }
 }
 
 fn print_help_message(
@@ -524,7 +547,7 @@ fn print_help_message(
         \u{A0}-i <IGNORE>      Ignore specified commands (e.g. \"ls|grep|nvim\")\n\
         \u{A0}-b <BAR_SIZE>    Size of the bar graph (default: {})\n\
         \u{A0}-n               Do not print the bar\n\
-        \u{A0}-nh              Disable history mode (can be used for any data)\n\
+        \u{A0}-nh              Disable history mode (requires FILE or piped/redirected stdin)\n\
         \u{A0}-np              Do not print the percentage in the bar\n\
         \u{A0}-nc              Do not print the inverse cumulative percentage in the bar\n\
         \u{A0}-o <FMT>         Output format: text (default), json, csv\n\
