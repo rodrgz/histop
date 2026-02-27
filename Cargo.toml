@@ -1,8 +1,8 @@
 [package]
 name = "histop"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
-description = "Show your most frequently used bash/zsh/fish commands in a visually appealing and easy-to-understand format."
+description = "Show your most frequently used shell commands in a visually appealing and easy-to-understand format."
 license = "MIT"
 
 [dependencies]
