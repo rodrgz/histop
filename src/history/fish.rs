@@ -12,8 +12,6 @@ use ahash::{AHashMap, AHashSet};
 use std::fs;
 use std::io::{BufRead, BufReader};
 
-use crate::shared::command_parse::{SplitCommands, get_first_word};
-
 /// Parse fish_history file and count commands
 ///
 /// # Arguments
@@ -66,7 +64,7 @@ fn count_from_reader<R: BufRead>(
         }
 
         let line = match std::str::from_utf8(&line_buf) {
-            Ok(s) => trim_line_end(s),
+            Ok(s) => super::simple_history::trim_line_end(s),
             Err(_) => continue,
         };
 
@@ -80,7 +78,12 @@ fn count_from_reader<R: BufRead>(
     }
 
     if !current_cmd.is_empty() {
-        count_commands(cmd_count, &current_cmd, filtered_commands, no_hist);
+        super::simple_history::count_commands(
+            cmd_count,
+            &current_cmd,
+            filtered_commands,
+            no_hist,
+        );
     }
 
     Ok(())
@@ -96,7 +99,12 @@ fn process_line(
     // Fish history command lines start with "- cmd: "
     if let Some(cmd) = trimmed_line.strip_prefix("- cmd: ") {
         if !current_cmd.is_empty() {
-            count_commands(cmd_count, current_cmd, filtered_commands, no_hist);
+            super::simple_history::count_commands(
+                cmd_count,
+                current_cmd,
+                filtered_commands,
+                no_hist,
+            );
         }
         current_cmd.clear();
         current_cmd.push_str(cmd);
@@ -126,45 +134,14 @@ fn process_line(
             || trimmed_line.starts_with("  paths:")
             || trimmed_line.starts_with("  - ")
         {
-            count_commands(cmd_count, current_cmd, filtered_commands, no_hist);
+            super::simple_history::count_commands(
+                cmd_count,
+                current_cmd,
+                filtered_commands,
+                no_hist,
+            );
             current_cmd.clear();
         }
-    }
-}
-
-#[inline]
-fn trim_line_end(line: &str) -> &str {
-    line.trim_end_matches(['\n', '\r'])
-}
-
-fn count_commands(
-    cmd_count: &mut AHashMap<String, usize>,
-    line: &str,
-    filtered_commands: &AHashSet<&str>,
-    no_hist: bool,
-) {
-    if line.contains('|') && !no_hist {
-        for subcommand in SplitCommands::new(line) {
-            if let Some(first_word) =
-                get_first_word(subcommand, filtered_commands)
-            {
-                increment_count(cmd_count, first_word);
-            }
-        }
-    } else if let Some(first_word) = get_first_word(line, filtered_commands) {
-        increment_count(cmd_count, first_word);
-    }
-}
-
-#[inline]
-fn increment_count(
-    cmd_count: &mut AHashMap<String, usize>,
-    first_word: &str,
-) {
-    if let Some(existing) = cmd_count.get_mut(first_word) {
-        *existing += 1;
-    } else {
-        cmd_count.insert(first_word.to_string(), 1);
     }
 }
 

@@ -159,6 +159,11 @@ fn parse_toml(content: &str) -> Result<HashMap<String, ParsedValue>, String> {
                 key.to_string(),
                 ParsedValue { value, line: line_num + 1 },
             );
+        } else {
+            return Err(format!(
+                "Line {}: malformed line (expected 'key = value')",
+                line_num + 1
+            ));
         }
     }
 
@@ -170,11 +175,19 @@ fn parse_value(s: &str) -> Result<Value, String> {
     let s = s.trim();
 
     // String (quoted)
-    if (s.starts_with('"') && s.ends_with('"'))
-        || (s.starts_with('\'') && s.ends_with('\''))
-    {
-        let inner = &s[1..s.len() - 1];
+    if let Some(inner) = s.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
         return Ok(Value::String(inner.to_string()));
+    }
+    if let Some(inner) = s.strip_prefix('\'').and_then(|s| s.strip_suffix('\''))
+    {
+        return Ok(Value::String(inner.to_string()));
+    }
+    if s.starts_with('"')
+        || s.ends_with('"')
+        || s.starts_with('\'')
+        || s.ends_with('\'')
+    {
+        return Err("unterminated quoted string".to_string());
     }
 
     // Array
@@ -193,7 +206,10 @@ fn parse_value(s: &str) -> Result<Value, String> {
     Ok(Value::String(s.to_string()))
 }
 
-/// Parse array contents
+/// Parse array contents with quote-aware comma splitting.
+///
+/// Respects double and single quotes so that commas inside quoted
+/// strings (e.g. `"git,status"`) do not split the value.
 fn parse_array(s: &str) -> Result<Vec<Value>, String> {
     let mut items = Vec::new();
     let s = s.trim();
@@ -202,12 +218,32 @@ fn parse_array(s: &str) -> Result<Vec<Value>, String> {
         return Ok(items);
     }
 
-    // Simple comma-separated parsing
-    for item in s.split(',') {
-        let item = item.trim();
-        if !item.is_empty() {
-            items.push(parse_value(item)?);
+    let mut in_double = false;
+    let mut in_single = false;
+    let mut start = 0;
+
+    for (i, ch) in s.char_indices() {
+        match ch {
+            '"' if !in_single => in_double = !in_double,
+            '\'' if !in_double => in_single = !in_single,
+            ',' if !in_double && !in_single => {
+                let item = s[start..i].trim();
+                if !item.is_empty() {
+                    items.push(parse_value(item)?);
+                }
+                start = i + 1;
+            }
+            _ => {}
         }
+    }
+
+    if in_double || in_single {
+        return Err("unterminated quote in array".to_string());
+    }
+
+    let last = s[start..].trim();
+    if !last.is_empty() {
+        items.push(parse_value(last)?);
     }
 
     Ok(items)
@@ -378,5 +414,36 @@ count = 10 # inline comments not supported, this will fail
         let content = "color = \"sometimes\"";
         let config = FileConfig::parse(content);
         assert!(config.is_err());
+    }
+
+    #[test]
+    fn test_parse_malformed_line_without_equals_rejected() {
+        let content = "count 30";
+        let err = FileConfig::parse(content).unwrap_err();
+        assert!(err.contains("malformed line"), "got: {}", err);
+    }
+
+    #[test]
+    fn test_parse_array_with_quoted_comma() {
+        let content = r#"ignore = ["git,status", "ls"]"#;
+        let config = FileConfig::parse(content).unwrap();
+        assert_eq!(
+            config.ignore,
+            Some(vec!["git,status".to_string(), "ls".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_parse_unterminated_quoted_string_rejected() {
+        let content = r#"color = ""#;
+        let err = FileConfig::parse(content).unwrap_err();
+        assert!(err.contains("unterminated quoted string"), "got: {}", err);
+    }
+
+    #[test]
+    fn test_parse_array_with_unterminated_quote_rejected() {
+        let content = r#"ignore = ["ls, "cd"]"#;
+        let err = FileConfig::parse(content).unwrap_err();
+        assert!(err.contains("unterminated quote in array"), "got: {}", err);
     }
 }

@@ -418,8 +418,20 @@ fn default_history_candidates(home: &str) -> Vec<String> {
 fn get_parent_shell() -> Result<String, String> {
     let stat_contents = fs::read_to_string("/proc/self/stat")
         .map_err(|e| format!("Failed to read /proc/self/stat: {}", e))?;
-    let fields: Vec<&str> = stat_contents.split_whitespace().collect();
-    let ppid = fields.get(3).ok_or("Invalid /proc/self/stat format")?;
+
+    // The comm field (field 2) is enclosed in parentheses and may contain
+    // spaces, so we locate the last ')' and parse fields after it.
+    let after_comm = stat_contents
+        .rfind(')')
+        .and_then(|pos| stat_contents.get(pos + 1..))
+        .ok_or("Invalid /proc/self/stat format")?;
+
+    // Fields after comm: state(3) ppid(4) ...
+    // after_comm starts with " S ppid ..." (space-separated)
+    let ppid = after_comm
+        .split_whitespace()
+        .nth(1) // skip state, take ppid
+        .ok_or("Invalid /proc/self/stat format: missing ppid")?;
 
     let cmdline_file = PathBuf::from(format!("/proc/{}/cmdline", ppid));
     let cmdline_contents = fs::read(&cmdline_file).map_err(|e| {

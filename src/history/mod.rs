@@ -4,6 +4,7 @@ pub mod detect;
 pub mod fish;
 pub mod powershell;
 pub mod shell;
+pub mod simple_history;
 pub mod tcsh;
 
 pub use detect::{HistoryFormat, detect_history_format};
