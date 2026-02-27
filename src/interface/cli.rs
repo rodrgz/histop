@@ -1,6 +1,6 @@
 //! CLI argument parsing and configuration
 
-use std::{env, fs, path::Path, path::PathBuf, process};
+use std::{env, fs, io::IsTerminal, path::Path, path::PathBuf, process};
 
 use histop::config::FileConfig;
 use histop::output::OutputFormat;
@@ -77,6 +77,11 @@ impl Config {
                 }
                 "-f" => {
                     let value = require_value_argument(&args, &mut i, "-f")?;
+                    if cli_overrides.file.is_some() {
+                        return Err(
+                            "Conflicting input file arguments: use either -f <FILE> or positional FILE, not both".to_string(),
+                        );
+                    }
                     cli_overrides.file = Some(value);
                 }
                 "-c" => {
@@ -141,7 +146,15 @@ impl Config {
                     cli_overrides.config_path = Some(value);
                 }
                 _ => {
-                    return Err(format!("Invalid option: {}", args[i]));
+                    if args[i].starts_with('-') {
+                        return Err(format!("Invalid option: {}", args[i]));
+                    }
+                    if cli_overrides.file.is_some() {
+                        return Err(
+                            "Conflicting input file arguments: use either -f <FILE> or positional FILE, not both".to_string(),
+                        );
+                    }
+                    cli_overrides.file = Some(args[i].clone());
                 }
             }
             i += 1;
@@ -159,7 +172,12 @@ impl Config {
         config.apply_cli_overrides(&cli_overrides);
 
         if config.file.is_empty() {
-            config.file = get_histfile()?;
+            if should_read_stdin(config.no_hist, std::io::stdin().is_terminal())
+            {
+                config.file = "-".to_string();
+            } else {
+                config.file = get_histfile()?;
+            }
         }
 
         Ok(config)
@@ -228,6 +246,13 @@ impl Config {
             self.color_mode = color_mode;
         }
     }
+}
+
+fn should_read_stdin(
+    no_hist: bool,
+    stdin_is_terminal: bool,
+) -> bool {
+    no_hist && !stdin_is_terminal
 }
 
 fn parse_usize_argument(
@@ -468,6 +493,21 @@ mod tests {
         push_unique(&mut values, "zsh".to_string());
         assert_eq!(values, vec!["bash".to_string(), "zsh".to_string()]);
     }
+
+    #[test]
+    fn test_should_read_stdin_when_no_hist_and_stdin_not_terminal() {
+        assert!(should_read_stdin(true, false));
+    }
+
+    #[test]
+    fn test_should_not_read_stdin_when_history_mode_enabled() {
+        assert!(!should_read_stdin(false, false));
+    }
+
+    #[test]
+    fn test_should_not_read_stdin_when_stdin_is_terminal() {
+        assert!(!should_read_stdin(true, true));
+    }
 }
 
 fn print_help_message(
@@ -475,9 +515,9 @@ fn print_help_message(
     bar_size: usize,
 ) {
     println!(
-        "Usage: histop [options]\n\
+        "Usage: histop [options] [FILE]\n\
         \u{A0}-h, --help       Print this help message\n\
-        \u{A0}-f <FILE>        Path to the history file\n\
+        \u{A0}-f <FILE>        Path to the history file (or pass FILE positionally)\n\
         \u{A0}-c <COUNT>       Number of commands to print (default: {})\n\
         \u{A0}-a               Print all commands (overrides -c)\n\
         \u{A0}-m <MORE_THAN>   Only consider commands used more than <MORE_THAN> times\n\

@@ -29,9 +29,15 @@ pub fn count_from_file(
         filtered_commands.insert(s.as_str());
     }
 
-    let file = fs::File::open(file_path)?;
-    let reader = BufReader::with_capacity(BUFFER_SIZE, file);
-    count_from_reader(reader, &mut cmd_count, &filtered_commands, no_hist)?;
+    if file_path == "-" {
+        let stdin = std::io::stdin();
+        let reader = BufReader::with_capacity(BUFFER_SIZE, stdin.lock());
+        count_from_reader(reader, &mut cmd_count, &filtered_commands, no_hist)?;
+    } else {
+        let file = fs::File::open(file_path)?;
+        let reader = BufReader::with_capacity(BUFFER_SIZE, file);
+        count_from_reader(reader, &mut cmd_count, &filtered_commands, no_hist)?;
+    }
 
     Ok(cmd_count)
 }

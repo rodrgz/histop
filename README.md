@@ -26,21 +26,34 @@ cargo build #or nix build
 
 ```
 $ histop -h 
-Usage: histop [options]
+Usage: histop [options] [FILE]
  -h, --help       Print this help message
- -f <FILE>        Path to the history file
+ -f <FILE>        Path to the history file (or pass FILE as positional argument)
  -c <COUNT>       Number of commands to print (default: 25)
  -a               Print all commands (overrides -c)
  -m <MORE_THAN>   Only consider commands used more than <MORE_THAN> times
  -i <IGNORE>      Ignore specified commands (e.g. "ls|grep|nvim")
  -b <BAR_SIZE>    Size of the bar graph (default: 25)
  -n               Do not print the bar
- -nh              Disable history mode (can be used for any data)
+ -nh              Disable history mode (can be used for any data; reads stdin when piped)
  -np              Do not print the percentage in the bar
  -nc              Do not print the inverse cumulative percentage in the bar
  ██               Percentage
  ▓▓               Inverse cumulative percentage
 ```
+
+## Using `-nh` with stdin
+
+When `-nh` is set and no `-f` is provided, `histop` reads from `stdin` if
+input is piped or redirected.
+
+```bash
+histop -nh < arquivo.txt
+cat arquivo.txt | histop -nh
+```
+
+If `stdin` is a terminal (not piped), `histop` falls back to shell history
+detection as usual.
 
 ## Example
 

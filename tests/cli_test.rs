@@ -107,6 +107,27 @@ mod file_flag {
 
         assert!(!output.status.success());
     }
+
+    #[test]
+    fn test_positional_file_argument() {
+        let path = fixtures_path().join("bash_history");
+        let output = run_histop(&[path.to_str().unwrap()]);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        assert!(output.status.success());
+        assert!(stdout.contains("git") || stdout.contains("ls"));
+    }
+
+    #[test]
+    fn test_positional_file_conflicts_with_f_flag() {
+        let path = fixtures_path().join("bash_history");
+        let output =
+            run_histop(&["-f", path.to_str().unwrap(), path.to_str().unwrap()]);
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("Conflicting input file arguments"));
+    }
 }
 
 mod count_flag {
@@ -335,6 +356,9 @@ mod no_bar_flag {
 
 mod no_hist_flag {
     use super::*;
+    use std::fs;
+    use std::io::Write;
+    use std::process::Stdio;
 
     #[test]
     fn test_no_hist_flag() {
@@ -343,6 +367,38 @@ mod no_hist_flag {
         let output = run_histop(&["-f", path.to_str().unwrap(), "-nh", "-a"]);
 
         assert!(output.status.success());
+    }
+
+    #[test]
+    fn test_no_hist_flag_reads_from_stdin_when_piped() {
+        let home = unique_temp_path("histop_no_hist_stdin", "");
+        fs::create_dir_all(&home).unwrap();
+        fs::write(home.join(".bash_history"), "fromhistory\n").unwrap();
+
+        let mut child = Command::new(histop_bin())
+            .args(["-nh", "-a", "-n", "--color", "never"])
+            .env("HOME", &home)
+            .env_remove("HISTFILE")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Failed to execute histop");
+
+        {
+            let stdin = child.stdin.as_mut().expect("stdin should be piped");
+            stdin.write_all(b"frompipe\nfrompipe\nother\n").unwrap();
+        }
+
+        let output = child.wait_with_output().expect("Failed waiting process");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        fs::remove_dir_all(home).ok();
+
+        assert!(output.status.success());
+        assert!(stdout.contains("frompipe"));
+        assert!(stdout.contains("other"));
+        assert!(!stdout.contains("fromhistory"));
     }
 }
 
