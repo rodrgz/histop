@@ -7,6 +7,27 @@
 
 Uncover the hidden gems of your command history! This program analyzes your shell history file and presents the most frequently used commands in a visually appealing and easy-to-understand format. With powerful options to filter out noise and focus on what matters.
 
+## Installation
+
+```bash
+cargo install histop
+```
+
+After installing:
+
+```bash
+histop --help
+histop --version
+```
+
+## Build From Source
+
+```bash
+git clone https://github.com/rodrgz/histop
+cd histop
+cargo build # or nix build
+```
+
 ## Supported Shells
 
 - **Ash** (`~/.ash_history`)
@@ -19,15 +40,11 @@ Uncover the hidden gems of your command history! This program analyzes your shel
 ## Usage
 
 ```
-git clone https://git.sr.ht/~rodrgz/histop
-cd histop
-cargo build #or nix build
-```
-
-```
 $ histop -h 
+histop 0.3.1
 Usage: histop [options] [FILE]
  -h, --help       Print this help message
+ -v, --version    Print version information
  -f <FILE>        Path to the history file (or pass FILE positionally)
  -c <COUNT>       Number of commands to print (default: 25)
  -a               Print all commands (overrides -c)

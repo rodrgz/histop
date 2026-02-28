@@ -1,9 +1,22 @@
 [package]
 name = "histop"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
+rust-version = "1.85"
 description = "Show your most frequently used shell commands in a visually appealing and easy-to-understand format."
 license = "MIT"
+readme = "README.md"
+repository = "https://github.com/rodrgz/histop"
+keywords = ["cli", "shell", "history", "terminal", "productivity"]
+categories = ["command-line-utilities"]
+include = [
+    "/src/**",
+    "/tests/**",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/README.md",
+    "/LICENSE",
+]
 
 [dependencies]
 memmap2 = "0.9"
