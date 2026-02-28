@@ -6,7 +6,9 @@ description = "Show your most frequently used shell commands in a visually appea
 license = "MIT"
 
 [dependencies]
-ahash = "0.8.12"
+memmap2 = "0.9"
+bstr = "1"
+ahash = "0.8"
 
 [profile.release]
 lto = true
@@ -14,3 +16,8 @@ codegen-units = 1
 panic = "abort"
 strip = true
 opt-level = 3
+
+[profile.profiling]
+inherits = "release"
+strip = false
+debug = 1

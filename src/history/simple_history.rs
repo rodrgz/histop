@@ -8,6 +8,9 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 
+use bstr::ByteSlice;
+use memmap2::Mmap;
+
 use crate::shared::command_parse::{SplitCommands, get_first_word};
 
 /// Count commands from a history file, skipping lines that fail the
@@ -21,8 +24,6 @@ pub fn count_from_file<F>(
 where
     F: Fn(&str) -> bool,
 {
-    let file = File::open(file_path)?;
-    let mut reader = BufReader::new(file);
     let mut cmd_count = AHashMap::default();
 
     let mut filtered_commands = AHashSet::with_capacity(ignore.len() + 2);
@@ -34,24 +35,41 @@ where
         filtered_commands.insert(s.as_str());
     }
 
-    let mut line_buf = Vec::with_capacity(256);
-    loop {
-        line_buf.clear();
-        let bytes_read = reader.read_until(b'\n', &mut line_buf)?;
-        if bytes_read == 0 {
-            break;
+    if file_path == "-" {
+        let stdin = std::io::stdin();
+        let mut reader = BufReader::new(stdin.lock());
+        let mut line_buf = Vec::with_capacity(256);
+        loop {
+            line_buf.clear();
+            let bytes_read = reader.read_until(b'\n', &mut line_buf)?;
+            if bytes_read == 0 {
+                break;
+            }
+            let line = match line_buf.to_str() {
+                Ok(s) => trim_line_end(s),
+                Err(_) => continue,
+            };
+            if line.trim().is_empty() || skip_line(line) {
+                continue;
+            }
+            count_commands(&mut cmd_count, line, &filtered_commands, no_hist);
         }
+    } else {
+        let file = File::open(file_path)?;
+        let mmap = unsafe { Mmap::map(&file)? };
 
-        let line = match std::str::from_utf8(&line_buf) {
-            Ok(s) => trim_line_end(s),
-            Err(_) => continue,
-        };
+        for line_bytes in bstr::ByteSlice::lines(&*mmap) {
+            let line = match line_bytes.to_str() {
+                Ok(s) => trim_line_end(s),
+                Err(_) => continue,
+            };
 
-        if line.trim().is_empty() || skip_line(line) {
-            continue;
+            if line.trim().is_empty() || skip_line(line) {
+                continue;
+            }
+
+            count_commands(&mut cmd_count, line, &filtered_commands, no_hist);
         }
-
-        count_commands(&mut cmd_count, line, &filtered_commands, no_hist);
     }
 
     Ok(cmd_count)
@@ -68,7 +86,7 @@ pub(super) fn count_commands(
     filtered_commands: &AHashSet<&str>,
     no_hist: bool,
 ) {
-    if line.contains('|') && !no_hist {
+    if !no_hist && line.as_bytes().find_byte(b'|').is_some() {
         for subcommand in SplitCommands::new(line) {
             if let Some(first_word) =
                 get_first_word(subcommand, filtered_commands)
@@ -86,7 +104,11 @@ fn increment_count(
     cmd_count: &mut AHashMap<String, usize>,
     first_word: &str,
 ) {
-    *cmd_count.entry(first_word.to_string()).or_insert(0) += 1;
+    if let Some(count) = cmd_count.get_mut(first_word) {
+        *count += 1;
+    } else {
+        cmd_count.insert(first_word.to_string(), 1);
+    }
 }
 
 #[cfg(test)]

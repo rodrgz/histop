@@ -9,8 +9,9 @@
 //! ```
 
 use ahash::{AHashMap, AHashSet};
+use bstr::ByteSlice;
+use memmap2::Mmap;
 use std::fs;
-use std::io::{BufRead, BufReader};
 
 /// Parse fish_history file and count commands
 ///
@@ -25,9 +26,6 @@ pub fn count_from_file(
     ignore: &[String],
     no_hist: bool,
 ) -> Result<AHashMap<String, usize>, std::io::Error> {
-    // 256KB buffer size
-    const BUFFER_SIZE: usize = 256 * 1024;
-
     let mut cmd_count: AHashMap<String, usize> = AHashMap::default();
 
     let mut filtered_commands: AHashSet<&str> =
@@ -41,29 +39,33 @@ pub fn count_from_file(
     }
 
     let file = fs::File::open(file_path)?;
-    let reader = BufReader::with_capacity(BUFFER_SIZE, file);
-    count_from_reader(reader, &mut cmd_count, &filtered_commands, no_hist)?;
+    let mmap = unsafe { Mmap::map(&file)? };
+    count_from_bytes(&mmap, &mut cmd_count, &filtered_commands, no_hist);
 
     Ok(cmd_count)
 }
 
-fn count_from_reader<R: BufRead>(
-    mut reader: R,
+fn count_from_bytes(
+    bytes: &[u8],
     cmd_count: &mut AHashMap<String, usize>,
     filtered_commands: &AHashSet<&str>,
     no_hist: bool,
-) -> std::io::Result<()> {
+) {
     let mut current_cmd = String::with_capacity(256);
-    let mut line_buf = Vec::with_capacity(256);
 
-    loop {
-        line_buf.clear();
-        let bytes_read = reader.read_until(b'\n', &mut line_buf)?;
-        if bytes_read == 0 {
-            break;
+    for line_bytes in bstr::ByteSlice::lines(bytes) {
+        if !current_cmd.is_empty() && is_ascii_metadata_line(line_bytes) {
+            super::simple_history::count_commands(
+                cmd_count,
+                &current_cmd,
+                filtered_commands,
+                no_hist,
+            );
+            current_cmd.clear();
+            continue;
         }
 
-        let line = match std::str::from_utf8(&line_buf) {
+        let line = match line_bytes.to_str() {
             Ok(s) => super::simple_history::trim_line_end(s),
             Err(_) => continue,
         };
@@ -85,8 +87,14 @@ fn count_from_reader<R: BufRead>(
             no_hist,
         );
     }
+}
 
-    Ok(())
+#[inline]
+fn is_ascii_metadata_line(line_bytes: &[u8]) -> bool {
+    line_bytes.is_ascii()
+        && (line_bytes.starts_with(b"  when: ")
+            || line_bytes.starts_with(b"  paths:")
+            || line_bytes.starts_with(b"  - "))
 }
 
 fn process_line(
@@ -223,6 +231,30 @@ mod tests {
             count_from_file(path.to_str().unwrap(), &[], false).unwrap();
         assert_eq!(result.get("ls"), Some(&1));
         assert_eq!(result.get("git"), Some(&1));
+
+        fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn test_invalid_utf8_metadata_line_is_skipped_not_terminated() {
+        use std::io::Write;
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now_nanos =
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "test_fish_invalid_utf8_metadata_{}_{}",
+            std::process::id(),
+            now_nanos
+        ));
+        let mut file = fs::File::create(&path).unwrap();
+        writeln!(file, "- cmd: echo hello\\").unwrap();
+        file.write_all(b"  when: \xFF\xFE\n").unwrap();
+        writeln!(file, "  world").unwrap();
+        writeln!(file, "  when: 1680820391").unwrap();
+
+        let result =
+            count_from_file(path.to_str().unwrap(), &[], false).unwrap();
+        assert_eq!(result.get("echo"), Some(&1));
 
         fs::remove_file(path).ok();
     }

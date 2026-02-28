@@ -1,6 +1,7 @@
 //! Shared utilities for command parsing and processing.
 
 use ahash::AHashSet;
+use bstr::ByteSlice;
 
 /// Extract the first meaningful word(s) from a command.
 ///
@@ -15,26 +16,53 @@ pub fn get_first_word<'a>(
     cmd: &'a str,
     filtered: &AHashSet<&str>,
 ) -> Option<&'a str> {
-    for w in cmd.split_whitespace() {
-        // Skip end-of-options marker used in wrappers like sudo/doas
+    let bytes = cmd.as_bytes();
+    let mut i = 0;
+    let len = bytes.len();
+
+    while i < len {
+        // Skip whitespace efficiently
+        while i < len && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= len {
+            break;
+        }
+
+        let start = i;
+        while i < len && !bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        let w = &cmd[start..i];
+
+        // 1. Skip end-of-options marker (O(1))
         if w == "--" {
             continue;
         }
 
-        // Handle escaped commands (\ls -> ls) first
-        // Also handle cases like \sudo, \\sudo, reboot\
-        // We trim leading and trailing backslashes
+        // 2. Skip comments (O(1)) - check raw word first
+        if w.starts_with('#') {
+            return None;
+        }
+
+        // 3. Skip flags (O(1)) - check raw word first
+        if w.starts_with('-') {
+            continue;
+        }
+
+        // 4. Handle escaped commands (\ls -> ls) and separators
+        // We do this BEFORE filtered check to handle \sudo
         let clean_word = w.trim_matches('\\');
 
-        // Handle cases where \ is used as a separator or artifact inside the word
-        // e.g. cd\numount -> cd
-        // e.g. lsblk\\\n -> lsblk (where \n is literal n)
-        // We take the first component before any remaining backslash
+        // Handle cases like cd\numount -> cd
         let first_component =
-            clean_word.split('\\').next().unwrap_or(clean_word);
+            if let Some(idx) = clean_word.as_bytes().find_byte(b'\\') {
+                &clean_word[..idx]
+            } else {
+                clean_word
+            };
 
-        // Handle paths (e.g. ./mvnw -> mvnw, /bin/ls -> ls)
-        // We use rfind instead of Path::new to avoid overhead
+        // Handle paths (e.g. /bin/ls -> ls)
         let command_name =
             if let Some(idx) = first_component.rfind(std::path::is_separator) {
                 &first_component[idx + 1..]
@@ -46,23 +74,23 @@ pub fn get_first_word<'a>(
             continue;
         }
 
-        // Skip comments (stop parsing the line)
+        // Keep behavior for escaped comments/flags (\#comment, \-f)
         if command_name.starts_with('#') {
             return None;
         }
-
-        // Skip flags (e.g. -d, --help)
         if command_name.starts_with('-') {
             continue;
         }
 
-        // Skip filtered commands (sudo, doas, etc.)
+        // 5. Skip filtered commands (sudo, doas, etc.) - after cleaning
         if filtered.contains(command_name) {
             continue;
         }
 
-        // Skip environment variable assignments (FOO=bar) but not expansions ($FOO)
-        if !command_name.starts_with('$') && command_name.contains('=') {
+        // 6. Skip environment variable assignments (FOO=bar) - O(n) check last
+        if !command_name.starts_with('$')
+            && command_name.as_bytes().find_byte(b'=').is_some()
+        {
             continue;
         }
 
@@ -141,7 +169,7 @@ mod tests {
     fn test_get_first_word_with_doas() {
         let filters = AHashSet::from_iter(vec!["sudo", "doas"]);
         assert_eq!(
-            get_first_word("doas pacman -S vim", &filters),
+            get_first_word("doas pacman -S vpm", &filters),
             Some("pacman")
         );
     }
@@ -244,6 +272,13 @@ mod tests {
         // Simple parser sees "user" as the next word after skipping -u.
         // This is acceptable as it filters the flag itself.
         assert_eq!(get_first_word("sudo -u user id", &filters), Some("user"));
+    }
+
+    #[test]
+    fn test_get_first_word_escaped_comment_and_flag() {
+        let filters = AHashSet::from_iter(vec!["sudo"]);
+        assert_eq!(get_first_word("\\#comment", &filters), None);
+        assert_eq!(get_first_word("\\-f", &filters), None);
     }
 
     #[test]

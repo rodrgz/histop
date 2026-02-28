@@ -1,6 +1,8 @@
 //! Shell history parsing module
 
 use ahash::{AHashMap, AHashSet};
+use bstr::ByteSlice;
+use memmap2::Mmap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 
@@ -14,9 +16,6 @@ pub fn count_from_file(
     ignore: &[String],
     no_hist: bool,
 ) -> Result<AHashMap<String, usize>, std::io::Error> {
-    // 256KB buffer size
-    const BUFFER_SIZE: usize = 256 * 1024;
-
     let mut cmd_count: AHashMap<String, usize> = AHashMap::default();
 
     let mut filtered_commands: AHashSet<&str> =
@@ -31,15 +30,34 @@ pub fn count_from_file(
 
     if file_path == "-" {
         let stdin = std::io::stdin();
-        let reader = BufReader::with_capacity(BUFFER_SIZE, stdin.lock());
+        let reader = BufReader::new(stdin.lock());
         count_from_reader(reader, &mut cmd_count, &filtered_commands, no_hist)?;
     } else {
         let file = fs::File::open(file_path)?;
-        let reader = BufReader::with_capacity(BUFFER_SIZE, file);
-        count_from_reader(reader, &mut cmd_count, &filtered_commands, no_hist)?;
+        let mmap = unsafe { Mmap::map(&file)? };
+        count_from_bytes(&mmap, &mut cmd_count, &filtered_commands, no_hist);
     }
 
     Ok(cmd_count)
+}
+
+fn count_from_bytes(
+    bytes: &[u8],
+    cmd_count: &mut AHashMap<String, usize>,
+    filtered_commands: &AHashSet<&str>,
+    no_hist: bool,
+) {
+    let mut skip = false;
+    for line_bytes in bstr::ByteSlice::lines(bytes) {
+        let line = match line_bytes.to_str() {
+            Ok(s) => trim_line_end(s),
+            Err(_) => {
+                continue;
+            }
+        };
+
+        process_line(line, &mut skip, cmd_count, filtered_commands, no_hist);
+    }
 }
 
 fn count_from_reader<R: BufRead>(
@@ -58,7 +76,7 @@ fn count_from_reader<R: BufRead>(
             break;
         }
 
-        let line = match std::str::from_utf8(&line_buf) {
+        let line = match line_buf.to_str() {
             Ok(s) => trim_line_end(s),
             Err(_) => continue,
         };
@@ -163,7 +181,6 @@ fn increment_count(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ahash::AHashMap;
 
     #[test]
     fn test_count_commands_simple() {
