@@ -6,6 +6,8 @@ use histop::config::FileConfig;
 use histop::output::OutputFormat;
 use histop::output::color::ColorMode;
 
+const APP_NAME: &str = env!("CARGO_PKG_NAME");
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const NO_HIST_INPUT_ERROR: &str = "When using -nh without FILE, provide input through stdin (pipe or \
      redirection), or pass FILE with -f/positional argument";
 
@@ -76,6 +78,10 @@ impl Config {
                         help_config.apply_file_config(&file_config);
                     }
                     print_help_message(help_config.count, help_config.bar_size);
+                    process::exit(0);
+                }
+                "-v" | "--version" => {
+                    print_version();
                     process::exit(0);
                 }
                 "-f" => {
@@ -550,8 +556,10 @@ fn print_help_message(
     bar_size: usize,
 ) {
     println!(
-        "Usage: histop [options] [FILE]\n\
+        "{APP_NAME} {APP_VERSION}\n\
+        Usage: {APP_NAME} [options] [FILE]\n\
         \u{A0}-h, --help       Print this help message\n\
+        \u{A0}-v, --version    Print version information\n\
         \u{A0}-f <FILE>        Path to the history file (or pass FILE positionally)\n\
         \u{A0}-c <COUNT>       Number of commands to print (default: {})\n\
         \u{A0}-a               Print all commands (overrides -c)\n\
@@ -569,4 +577,8 @@ fn print_help_message(
         \u{A0}▓▓               Inverse cumulative percentage",
         count, bar_size
     );
+}
+
+fn print_version() {
+    println!("{APP_NAME} {APP_VERSION}");
 }

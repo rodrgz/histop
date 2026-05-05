@@ -6,6 +6,9 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const APP_NAME: &str = env!("CARGO_PKG_NAME");
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// Get the path to the histop binary
 fn histop_bin() -> PathBuf {
     // CARGO_BIN_EXE_<name> is set by Cargo during integration tests
@@ -51,7 +54,9 @@ mod help_flag {
 
         assert!(output.status.success());
         assert!(stdout.contains("Usage: histop"));
+        assert!(stdout.contains(&format!("{APP_NAME} {APP_VERSION}")));
         assert!(stdout.contains("-h, --help"));
+        assert!(stdout.contains("-v, --version"));
         assert!(stdout.contains("-f <FILE>"));
         assert!(stdout.contains("-c <COUNT>"));
         assert!(stdout.contains("-a"));
@@ -74,6 +79,28 @@ mod help_flag {
 
         assert!(output.status.success());
         assert!(stdout.contains("Usage: histop"));
+    }
+}
+
+mod version_flag {
+    use super::*;
+
+    #[test]
+    fn test_version_short_flag() {
+        let output = run_histop(&["-v"]);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        assert!(output.status.success());
+        assert_eq!(stdout.trim(), format!("{APP_NAME} {APP_VERSION}"));
+    }
+
+    #[test]
+    fn test_version_long_flag() {
+        let output = run_histop(&["--version"]);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        assert!(output.status.success());
+        assert_eq!(stdout.trim(), format!("{APP_NAME} {APP_VERSION}"));
     }
 }
 
@@ -722,12 +749,6 @@ mod invalid_options {
     fn test_unknown_short_option() {
         let output = run_histop(&["-z"]);
 
-        assert!(!output.status.success());
-    }
-
-    #[test]
-    fn test_removed_verbose_option() {
-        let output = run_histop(&["-v"]);
         assert!(!output.status.success());
     }
 
