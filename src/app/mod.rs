@@ -64,6 +64,25 @@ pub struct RunConfig {
     pub color_mode: ColorMode,
 }
 
+impl Default for RunConfig {
+    fn default() -> Self {
+        Self {
+            file: String::new(),
+            count: 25,
+            all: false,
+            more_than: 0,
+            ignore: Vec::new(),
+            bar_size: 25,
+            no_bar: false,
+            no_hist: false,
+            no_cumu: false,
+            no_perc: false,
+            output_format: OutputFormat::Text,
+            color_mode: ColorMode::Auto,
+        }
+    }
+}
+
 pub fn run(config: &RunConfig) -> Result<(), AppError> {
     let frequencies = history::load_command_frequencies(
         &config.file,

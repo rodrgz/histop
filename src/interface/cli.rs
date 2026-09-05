@@ -2,6 +2,7 @@
 
 use std::{env, fs, io::IsTerminal, path::Path, path::PathBuf, process};
 
+use histop::app::RunConfig;
 use histop::config::FileConfig;
 use histop::output::OutputFormat;
 use histop::output::color::ColorMode;
@@ -28,232 +29,195 @@ struct CliOverrides {
     config_path: Option<String>,
 }
 
-/// Application configuration parsed from CLI arguments
-pub struct Config {
-    pub file: String,
-    pub count: usize,
-    pub all: bool,
-    pub more_than: usize,
-    pub ignore: Vec<String>,
-    pub bar_size: usize,
-    pub no_bar: bool,
-    pub no_hist: bool,
-    pub no_cumu: bool,
-    pub no_perc: bool,
-    pub output_format: OutputFormat,
-    pub color_mode: ColorMode,
-}
+/// Parse configuration from command line arguments.
+pub fn from_args() -> Result<RunConfig, String> {
+    let args: Vec<String> = env::args().collect();
+    let mut cli_overrides = CliOverrides::default();
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            file: String::new(),
-            count: 25,
-            all: false,
-            more_than: 0,
-            ignore: Vec::new(),
-            bar_size: 25,
-            no_bar: false,
-            no_hist: false,
-            no_cumu: false,
-            no_perc: false,
-            output_format: OutputFormat::Text,
-            color_mode: ColorMode::Auto,
-        }
-    }
-}
-
-impl Config {
-    /// Parse configuration from command line arguments
-    pub fn from_args() -> Result<Self, String> {
-        let args: Vec<String> = env::args().collect();
-        let mut cli_overrides = CliOverrides::default();
-
-        let mut i = 1;
-        while i < args.len() {
-            match args[i].as_str() {
-                "-h" | "--help" => {
-                    let mut help_config = Config::default();
-                    if let Some(file_config) = FileConfig::load_default() {
-                        help_config.apply_file_config(&file_config);
-                    }
-                    print_help_message(help_config.count, help_config.bar_size);
-                    process::exit(0);
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-h" | "--help" => {
+                let mut help_config = RunConfig::default();
+                if let Some(file_config) = FileConfig::load_default() {
+                    apply_file_config(&mut help_config, &file_config);
                 }
-                "-v" | "--version" => {
-                    print_version();
-                    process::exit(0);
-                }
-                "-f" => {
-                    let value = require_value_argument(&args, &mut i, "-f")?;
-                    if cli_overrides.file.is_some() {
-                        return Err(
-                            "Conflicting input file arguments: use either -f <FILE> or positional FILE, not both".to_string(),
-                        );
-                    }
-                    cli_overrides.file = Some(value);
-                }
-                "-c" => {
-                    let value = require_value_argument(&args, &mut i, "-c")?;
-                    cli_overrides.count =
-                        Some(parse_usize_argument(&value, "-c")?);
-                }
-                "-a" => {
-                    cli_overrides.all = true;
-                }
-                "-m" => {
-                    let value = require_value_argument(&args, &mut i, "-m")?;
-                    cli_overrides.more_than =
-                        Some(parse_non_negative_usize_argument(&value, "-m")?);
-                }
-                "-i" => {
-                    let value = require_value_argument(&args, &mut i, "-i")?;
-                    cli_overrides.ignore = Some(
-                        value
-                            .split('|')
-                            .map(|s| s.trim().to_string())
-                            .collect(),
-                    );
-                }
-                "-b" => {
-                    let value = require_value_argument(&args, &mut i, "-b")?;
-                    cli_overrides.bar_size =
-                        Some(parse_usize_argument(&value, "-b")?);
-                }
-                "-n" => {
-                    cli_overrides.no_bar = true;
-                }
-                "-nh" => {
-                    cli_overrides.no_hist = true;
-                }
-                "-np" => {
-                    cli_overrides.no_perc = true;
-                }
-                "-nc" => {
-                    cli_overrides.no_cumu = true;
-                }
-                "-o" => {
-                    let value = require_value_argument(&args, &mut i, "-o")?;
-                    cli_overrides.output_format = Some(
-                        OutputFormat::parse(&value).ok_or_else(|| {
-                            format!("Invalid output format: {}. Use text, json, or csv", value)
-                        })?,
-                    );
-                }
-                "--color" => {
-                    let value =
-                        require_value_argument(&args, &mut i, "--color")?;
-                    cli_overrides.color_mode = Some(
-                        ColorMode::parse(&value).ok_or_else(|| {
-                            format!("Invalid color mode: {}. Use auto, always, or never", value)
-                        })?,
-                    );
-                }
-                "--config" => {
-                    let value =
-                        require_value_argument(&args, &mut i, "--config")?;
-                    cli_overrides.config_path = Some(value);
-                }
-                _ => {
-                    if args[i].starts_with('-') {
-                        return Err(format!("Invalid option: {}", args[i]));
-                    }
-                    if cli_overrides.file.is_some() {
-                        return Err(
-                            "Conflicting input file arguments: use either -f <FILE> or positional FILE, not both".to_string(),
-                        );
-                    }
-                    cli_overrides.file = Some(args[i].clone());
-                }
+                print_help_message(help_config.count, help_config.bar_size);
+                process::exit(0);
             }
-            i += 1;
-        }
-
-        let mut config = Config::default();
-        if let Some(file_config) = FileConfig::load_default() {
-            config.apply_file_config(&file_config);
-        }
-        if let Some(ref config_path) = cli_overrides.config_path {
-            let file_config = FileConfig::load(Path::new(config_path))
-                .map_err(|e| format!("Failed to load config: {}", e))?;
-            config.apply_file_config(&file_config);
-        }
-        config.apply_cli_overrides(&cli_overrides);
-
-        if config.file.is_empty() {
-            let stdin_is_terminal = std::io::stdin().is_terminal();
-            if config.no_hist {
-                config.file = resolve_no_hist_input(stdin_is_terminal)?;
-            } else {
-                config.file = get_histfile()?;
+            "-v" | "--version" => {
+                print_version();
+                process::exit(0);
+            }
+            "-f" => {
+                let value = require_value_argument(&args, &mut i, "-f")?;
+                if cli_overrides.file.is_some() {
+                    return Err(
+                        "Conflicting input file arguments: use either -f <FILE> or positional FILE, not both".to_string(),
+                    );
+                }
+                cli_overrides.file = Some(value);
+            }
+            "-c" => {
+                let value = require_value_argument(&args, &mut i, "-c")?;
+                cli_overrides.count =
+                    Some(parse_usize_argument(&value, "-c")?);
+            }
+            "-a" => {
+                cli_overrides.all = true;
+            }
+            "-m" => {
+                let value = require_value_argument(&args, &mut i, "-m")?;
+                cli_overrides.more_than =
+                    Some(parse_non_negative_usize_argument(&value, "-m")?);
+            }
+            "-i" => {
+                let value = require_value_argument(&args, &mut i, "-i")?;
+                cli_overrides.ignore = Some(
+                    value
+                        .split('|')
+                        .map(|s| s.trim().to_string())
+                        .collect(),
+                );
+            }
+            "-b" => {
+                let value = require_value_argument(&args, &mut i, "-b")?;
+                cli_overrides.bar_size =
+                    Some(parse_usize_argument(&value, "-b")?);
+            }
+            "-n" => {
+                cli_overrides.no_bar = true;
+            }
+            "-nh" => {
+                cli_overrides.no_hist = true;
+            }
+            "-np" => {
+                cli_overrides.no_perc = true;
+            }
+            "-nc" => {
+                cli_overrides.no_cumu = true;
+            }
+            "-o" => {
+                let value = require_value_argument(&args, &mut i, "-o")?;
+                cli_overrides.output_format = Some(
+                    OutputFormat::parse(&value).ok_or_else(|| {
+                        format!("Invalid output format: {}. Use text, json, or csv", value)
+                    })?,
+                );
+            }
+            "--color" => {
+                let value =
+                    require_value_argument(&args, &mut i, "--color")?;
+                cli_overrides.color_mode = Some(
+                    ColorMode::parse(&value).ok_or_else(|| {
+                        format!("Invalid color mode: {}. Use auto, always, or never", value)
+                    })?,
+                );
+            }
+            "--config" => {
+                let value =
+                    require_value_argument(&args, &mut i, "--config")?;
+                cli_overrides.config_path = Some(value);
+            }
+            _ => {
+                if args[i].starts_with('-') {
+                    return Err(format!("Invalid option: {}", args[i]));
+                }
+                if cli_overrides.file.is_some() {
+                    return Err(
+                        "Conflicting input file arguments: use either -f <FILE> or positional FILE, not both".to_string(),
+                    );
+                }
+                cli_overrides.file = Some(args[i].clone());
             }
         }
-
-        Ok(config)
+        i += 1;
     }
 
-    /// Apply settings from a file config
-    fn apply_file_config(
-        &mut self,
-        file_config: &FileConfig,
-    ) {
-        if let Some(ref ignore) = file_config.ignore {
-            self.ignore = ignore.clone();
-        }
-        if let Some(bar_size) = file_config.bar_size {
-            self.bar_size = bar_size;
-        }
-        if let Some(count) = file_config.count {
-            self.count = count;
-        }
-        if let Some(color) = file_config.color {
-            self.color_mode = color;
-        }
-        if let Some(more_than) = file_config.more_than {
-            self.more_than = more_than;
+    let mut config = RunConfig::default();
+    if let Some(file_config) = FileConfig::load_default() {
+        apply_file_config(&mut config, &file_config);
+    }
+    if let Some(ref config_path) = cli_overrides.config_path {
+        let file_config = FileConfig::load(Path::new(config_path))
+            .map_err(|e| format!("Failed to load config: {}", e))?;
+        apply_file_config(&mut config, &file_config);
+    }
+    apply_cli_overrides(&mut config, &cli_overrides);
+
+    if config.file.is_empty() {
+        let stdin_is_terminal = std::io::stdin().is_terminal();
+        if config.no_hist {
+            config.file = resolve_no_hist_input(stdin_is_terminal)?;
+        } else {
+            config.file = get_histfile()?;
         }
     }
 
-    fn apply_cli_overrides(
-        &mut self,
-        overrides: &CliOverrides,
-    ) {
-        if let Some(ref file) = overrides.file {
-            self.file = file.clone();
-        }
-        if let Some(count) = overrides.count {
-            self.count = count;
-        }
-        if overrides.all {
-            self.all = true;
-        }
-        if let Some(more_than) = overrides.more_than {
-            self.more_than = more_than;
-        }
-        if let Some(ref ignore) = overrides.ignore {
-            self.ignore = ignore.clone();
-        }
-        if let Some(bar_size) = overrides.bar_size {
-            self.bar_size = bar_size;
-        }
-        if overrides.no_bar {
-            self.no_bar = true;
-        }
-        if overrides.no_hist {
-            self.no_hist = true;
-        }
-        if overrides.no_cumu {
-            self.no_cumu = true;
-        }
-        if overrides.no_perc {
-            self.no_perc = true;
-        }
-        if let Some(output_format) = overrides.output_format {
-            self.output_format = output_format;
-        }
-        if let Some(color_mode) = overrides.color_mode {
-            self.color_mode = color_mode;
-        }
+    Ok(config)
+}
+
+/// Apply settings from a file config.
+fn apply_file_config(
+    config: &mut RunConfig,
+    file_config: &FileConfig,
+) {
+    if let Some(ref ignore) = file_config.ignore {
+        config.ignore = ignore.clone();
+    }
+    if let Some(bar_size) = file_config.bar_size {
+        config.bar_size = bar_size;
+    }
+    if let Some(count) = file_config.count {
+        config.count = count;
+    }
+    if let Some(color) = file_config.color {
+        config.color_mode = color;
+    }
+    if let Some(more_than) = file_config.more_than {
+        config.more_than = more_than;
+    }
+}
+
+fn apply_cli_overrides(
+    config: &mut RunConfig,
+    overrides: &CliOverrides,
+) {
+    if let Some(ref file) = overrides.file {
+        config.file = file.clone();
+    }
+    if let Some(count) = overrides.count {
+        config.count = count;
+    }
+    if overrides.all {
+        config.all = true;
+    }
+    if let Some(more_than) = overrides.more_than {
+        config.more_than = more_than;
+    }
+    if let Some(ref ignore) = overrides.ignore {
+        config.ignore = ignore.clone();
+    }
+    if let Some(bar_size) = overrides.bar_size {
+        config.bar_size = bar_size;
+    }
+    if overrides.no_bar {
+        config.no_bar = true;
+    }
+    if overrides.no_hist {
+        config.no_hist = true;
+    }
+    if overrides.no_cumu {
+        config.no_cumu = true;
+    }
+    if overrides.no_perc {
+        config.no_perc = true;
+    }
+    if let Some(output_format) = overrides.output_format {
+        config.output_format = output_format;
+    }
+    if let Some(color_mode) = overrides.color_mode {
+        config.color_mode = color_mode;
     }
 }
 
