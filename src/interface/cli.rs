@@ -537,7 +537,7 @@ fn print_help_message(
         \u{A0}-o <FMT>         Output format: text (default), json, csv\n\
         \u{A0}--color <WHEN>   Color output: auto (default), always, never\n\
         \u{A0}--config <PATH>  Path to config file\n\
-        \u{A0}██               Percentage\n\
+        \u{A0}██               Percentage of displayed entries\n\
         \u{A0}▓▓               Inverse cumulative percentage",
         count, bar_size
     );

@@ -58,7 +58,7 @@ Usage: histop [options] [FILE]
  -o <FMT>         Output format: text (default), json, csv
  --color <WHEN>   Color output: auto (default), always, never
  --config <PATH>  Path to config file
- ██               Percentage
+ ██               Percentage of displayed entries
  ▓▓               Inverse cumulative percentage
 ```
 

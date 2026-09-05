@@ -22,12 +22,15 @@ fn build_command_entries(
     commands: &[RankedCommand],
     n: usize,
 ) -> Vec<CommandEntry> {
-    let total: usize = commands.iter().take(n).map(|entry| entry.count).sum();
+    let displayed_total: usize =
+        commands.iter().take(n).map(|entry| entry.count).sum();
 
     commands
         .iter()
         .take(n)
-        .map(|entry| CommandEntry::new(entry.name.clone(), entry.count, total))
+        .map(|entry| {
+            CommandEntry::new(entry.name.clone(), entry.count, displayed_total)
+        })
         .collect()
 }
 
