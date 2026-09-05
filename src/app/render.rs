@@ -1,6 +1,7 @@
 use std::io::{self, BufWriter, Write};
 
-use crate::app::{AppError, RankedCommand, RunConfig};
+use crate::app::{AppError, RunConfig};
+use crate::command::RankedCommand;
 use crate::output::bar::{self, BarConfig, BarItem};
 use crate::output::color::Colorizer;
 use crate::output::{self, CommandEntry, OutputFormat};

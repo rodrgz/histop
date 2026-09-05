@@ -42,6 +42,10 @@ pub(crate) struct FrequencyTable {
 }
 
 impl FrequencyTable {
+    pub(crate) fn from_counts(counts: AHashMap<String, usize>) -> Self {
+        Self { counts }
+    }
+
     /// Record every command represented by one decoded history line.
     pub(crate) fn record_line(
         &mut self,
@@ -68,6 +72,23 @@ impl FrequencyTable {
     /// the historic map representation.
     pub(crate) fn into_counts(self) -> AHashMap<String, usize> {
         self.counts
+    }
+
+    pub(crate) fn into_ranked(
+        self,
+        more_than: usize,
+    ) -> Vec<RankedCommand> {
+        let mut commands: Vec<RankedCommand> = self
+            .counts
+            .into_iter()
+            .filter(|(_, count)| *count > more_than)
+            .map(|(name, count)| RankedCommand { name, count })
+            .collect();
+
+        commands.sort_unstable_by(|a, b| {
+            b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name))
+        });
+        commands
     }
 
     fn record_history_segment(
@@ -108,9 +129,43 @@ impl FrequencyTable {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct RankedCommand {
+    pub(crate) name: String,
+    pub(crate) count: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_filter_and_sort_commands() {
+        let mut counts = AHashMap::default();
+        counts.insert("ls".to_string(), 4);
+        counts.insert("git".to_string(), 2);
+        counts.insert("cd".to_string(), 1);
+
+        let commands =
+            FrequencyTable::from_counts(counts).into_ranked(1);
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0].name, "ls");
+        assert_eq!(commands[0].count, 4);
+        assert_eq!(commands[1].name, "git");
+        assert_eq!(commands[1].count, 2);
+    }
+
+    #[test]
+    fn test_filter_and_sort_commands_deterministic_tie_break() {
+        let mut counts = AHashMap::default();
+        counts.insert("zsh".to_string(), 2);
+        counts.insert("bash".to_string(), 2);
+
+        let commands =
+            FrequencyTable::from_counts(counts).into_ranked(0);
+        assert_eq!(commands[0].name, "bash");
+        assert_eq!(commands[1].name, "zsh");
+    }
 
     #[test]
     fn test_record_line_contract_table() {
