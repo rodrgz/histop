@@ -132,7 +132,14 @@ mod file_flag {
     fn test_file_flag_with_nonexistent_file() {
         let output = run_histop(&["-f", "/nonexistent/path/to/history"]);
 
-        assert!(!output.status.success());
+        assert_eq!(output.status.code(), Some(1));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(
+            stderr.trim(),
+            "Error: Error reading shell history file /nonexistent/path/to/history: "
+                .to_owned()
+                + "No such file or directory (os error 2)"
+        );
     }
 
     #[test]
