@@ -294,6 +294,7 @@ mod more_than_flag {
 
 mod ignore_flag {
     use super::*;
+    use std::fs;
 
     #[test]
     fn test_ignore_single_command() {
@@ -331,6 +332,30 @@ mod ignore_flag {
                     .any(|line| line.trim().ends_with(&format!(" {}", cmd)))
             );
         }
+    }
+
+    #[test]
+    fn test_ignore_command_drops_pipeline_segment_arguments() {
+        let path = unique_temp_path("ignore_pipeline", ".history");
+        fs::write(&path, "ls | grep foo\n").unwrap();
+
+        let output = run_histop(&[
+            "-f",
+            path.to_str().unwrap(),
+            "-a",
+            "-i",
+            "grep",
+            "-o",
+            "json",
+        ]);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        assert!(output.status.success());
+        assert!(stdout.contains("\"command\": \"ls\""));
+        assert!(!stdout.contains("\"command\": \"grep\""));
+        assert!(!stdout.contains("\"command\": \"foo\""));
+
+        fs::remove_file(path).ok();
     }
 }
 

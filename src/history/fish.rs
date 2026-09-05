@@ -8,10 +8,12 @@
 //!     - /some/path
 //! ```
 
-use ahash::{AHashMap, AHashSet};
+use ahash::AHashMap;
 use bstr::ByteSlice;
 use memmap2::Mmap;
 use std::fs;
+
+use crate::command::{CommandMode, CommandPolicy, FrequencyTable};
 
 /// Parse fish_history file and count commands
 ///
@@ -26,41 +28,27 @@ pub fn count_from_file(
     ignore: &[String],
     no_hist: bool,
 ) -> Result<AHashMap<String, usize>, std::io::Error> {
-    let mut cmd_count: AHashMap<String, usize> = AHashMap::default();
-
-    let mut filtered_commands: AHashSet<&str> =
-        AHashSet::with_capacity(ignore.len() + 2);
-    if !no_hist {
-        filtered_commands.insert("sudo");
-        filtered_commands.insert("doas");
-    }
-    for s in ignore {
-        filtered_commands.insert(s.as_str());
-    }
+    let mode = if no_hist { CommandMode::Raw } else { CommandMode::History };
+    let policy = CommandPolicy::new(ignore, mode);
+    let mut frequencies = FrequencyTable::default();
 
     let file = fs::File::open(file_path)?;
     let mmap = unsafe { Mmap::map(&file)? };
-    count_from_bytes(&mmap, &mut cmd_count, &filtered_commands, no_hist);
+    count_from_bytes(&mmap, &mut frequencies, &policy);
 
-    Ok(cmd_count)
+    Ok(frequencies.into_counts())
 }
 
 fn count_from_bytes(
     bytes: &[u8],
-    cmd_count: &mut AHashMap<String, usize>,
-    filtered_commands: &AHashSet<&str>,
-    no_hist: bool,
+    frequencies: &mut FrequencyTable,
+    policy: &CommandPolicy<'_>,
 ) {
     let mut current_cmd = String::with_capacity(256);
 
     for line_bytes in bstr::ByteSlice::lines(bytes) {
         if !current_cmd.is_empty() && is_ascii_metadata_line(line_bytes) {
-            super::simple_history::count_commands(
-                cmd_count,
-                &current_cmd,
-                filtered_commands,
-                no_hist,
-            );
+            frequencies.record_line(&current_cmd, policy);
             current_cmd.clear();
             continue;
         }
@@ -73,19 +61,13 @@ fn count_from_bytes(
         process_line(
             line,
             &mut current_cmd,
-            cmd_count,
-            filtered_commands,
-            no_hist,
+            frequencies,
+            policy,
         );
     }
 
     if !current_cmd.is_empty() {
-        super::simple_history::count_commands(
-            cmd_count,
-            &current_cmd,
-            filtered_commands,
-            no_hist,
-        );
+        frequencies.record_line(&current_cmd, policy);
     }
 }
 
@@ -100,19 +82,13 @@ fn is_ascii_metadata_line(line_bytes: &[u8]) -> bool {
 fn process_line(
     trimmed_line: &str,
     current_cmd: &mut String,
-    cmd_count: &mut AHashMap<String, usize>,
-    filtered_commands: &AHashSet<&str>,
-    no_hist: bool,
+    frequencies: &mut FrequencyTable,
+    policy: &CommandPolicy<'_>,
 ) {
     // Fish history command lines start with "- cmd: "
     if let Some(cmd) = trimmed_line.strip_prefix("- cmd: ") {
         if !current_cmd.is_empty() {
-            super::simple_history::count_commands(
-                cmd_count,
-                current_cmd,
-                filtered_commands,
-                no_hist,
-            );
+            frequencies.record_line(current_cmd, policy);
         }
         current_cmd.clear();
         current_cmd.push_str(cmd);
@@ -142,12 +118,7 @@ fn process_line(
             || trimmed_line.starts_with("  paths:")
             || trimmed_line.starts_with("  - ")
         {
-            super::simple_history::count_commands(
-                cmd_count,
-                current_cmd,
-                filtered_commands,
-                no_hist,
-            );
+            frequencies.record_line(current_cmd, policy);
             current_cmd.clear();
         }
     }

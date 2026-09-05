@@ -3,7 +3,7 @@
 //! Reads bytes and skips invalid UTF-8 lines instead of aborting the
 //! entire file, matching the behavior of `shell.rs` and `fish.rs`.
 
-use ahash::{AHashMap, AHashSet};
+use ahash::AHashMap;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
@@ -11,7 +11,7 @@ use std::io::BufReader;
 use bstr::ByteSlice;
 use memmap2::Mmap;
 
-use crate::shared::command_parse::{SplitCommands, get_first_word};
+use crate::command::{CommandMode, CommandPolicy, FrequencyTable};
 
 /// Count commands from a history file, skipping lines that fail the
 /// provided `skip_line` predicate or contain invalid UTF-8.
@@ -24,16 +24,9 @@ pub fn count_from_file<F>(
 where
     F: Fn(&str) -> bool,
 {
-    let mut cmd_count = AHashMap::default();
-
-    let mut filtered_commands = AHashSet::with_capacity(ignore.len() + 2);
-    if !no_hist {
-        filtered_commands.insert("sudo");
-        filtered_commands.insert("doas");
-    }
-    for s in ignore {
-        filtered_commands.insert(s.as_str());
-    }
+    let mode = if no_hist { CommandMode::Raw } else { CommandMode::History };
+    let policy = CommandPolicy::new(ignore, mode);
+    let mut frequencies = FrequencyTable::default();
 
     if file_path == "-" {
         let stdin = std::io::stdin();
@@ -52,7 +45,7 @@ where
             if line.trim().is_empty() || skip_line(line) {
                 continue;
             }
-            count_commands(&mut cmd_count, line, &filtered_commands, no_hist);
+            frequencies.record_line(line, &policy);
         }
     } else {
         let file = File::open(file_path)?;
@@ -68,47 +61,16 @@ where
                 continue;
             }
 
-            count_commands(&mut cmd_count, line, &filtered_commands, no_hist);
+            frequencies.record_line(line, &policy);
         }
     }
 
-    Ok(cmd_count)
+    Ok(frequencies.into_counts())
 }
 
 #[inline]
 pub(super) fn trim_line_end(line: &str) -> &str {
     line.trim_end_matches(['\n', '\r'])
-}
-
-pub(super) fn count_commands(
-    cmd_count: &mut AHashMap<String, usize>,
-    line: &str,
-    filtered_commands: &AHashSet<&str>,
-    no_hist: bool,
-) {
-    if !no_hist && line.as_bytes().find_byte(b'|').is_some() {
-        for subcommand in SplitCommands::new(line) {
-            if let Some(first_word) =
-                get_first_word(subcommand, filtered_commands)
-            {
-                increment_count(cmd_count, first_word);
-            }
-        }
-    } else if let Some(first_word) = get_first_word(line, filtered_commands) {
-        increment_count(cmd_count, first_word);
-    }
-}
-
-#[inline]
-fn increment_count(
-    cmd_count: &mut AHashMap<String, usize>,
-    first_word: &str,
-) {
-    if let Some(count) = cmd_count.get_mut(first_word) {
-        *count += 1;
-    } else {
-        cmd_count.insert(first_word.to_string(), 1);
-    }
 }
 
 #[cfg(test)]
