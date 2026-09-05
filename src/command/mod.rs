@@ -190,6 +190,18 @@ mod tests {
                 expected: &[("apt", 1)],
             },
             Case {
+                line: "sudo grep foo",
+                ignored: &["grep"],
+                mode: CommandMode::History,
+                expected: &[],
+            },
+            Case {
+                line: "",
+                ignored: &[],
+                mode: CommandMode::History,
+                expected: &[],
+            },
+            Case {
                 line: "FOO=bar /bin/ls -la",
                 ignored: &[],
                 mode: CommandMode::History,

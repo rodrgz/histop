@@ -152,6 +152,7 @@ mod tests {
             count_from_file(path.to_str().unwrap(), &[], false).unwrap();
         assert_eq!(result.get("ls"), Some(&2));
         assert_eq!(result.get("git"), Some(&1));
+        assert_eq!(result.len(), 2);
 
         fs::remove_file(path).ok();
     }
