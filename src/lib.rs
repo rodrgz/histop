@@ -7,3 +7,5 @@ pub mod config;
 pub mod history;
 pub mod output;
 pub mod shared;
+
+mod command;
