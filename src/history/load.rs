@@ -1,63 +1,72 @@
 use ahash::AHashMap;
+use std::io;
 
-use crate::app::AppError;
-use crate::history::{self, HistoryFormat};
+use crate::command::FrequencyTable;
 
-pub(super) fn load_command_counts(
+use super::{
+    HistoryFormat, detect_history_format, fish, powershell, shell, tcsh,
+};
+
+pub(crate) struct HistoryLoadError {
+    pub(crate) parser: &'static str,
+    pub(crate) path: String,
+    pub(crate) source: io::Error,
+}
+
+pub(crate) fn load_command_frequencies(
     file: &str,
     ignore: &[String],
     no_hist: bool,
-) -> Result<AHashMap<String, usize>, AppError> {
+) -> Result<FrequencyTable, HistoryLoadError> {
     if no_hist {
-        return history::count_from_file(file, ignore, no_hist).map_err(
-            |source| AppError::HistoryRead {
-                parser: "raw",
-                path: file.to_string(),
-                source,
-            },
+        return with_context(
+            "raw",
+            file,
+            shell::count_from_file(file, ignore, no_hist),
         );
     }
 
     let history_format =
-        history::detect_history_format(file).map_err(|source| {
-            AppError::HistoryRead {
-                parser: "shell",
-                path: file.to_string(),
-                source,
-            }
+        detect_history_format(file).map_err(|source| HistoryLoadError {
+            parser: "shell",
+            path: file.to_string(),
+            source,
         })?;
-    match history_format {
-        HistoryFormat::Fish => history::fish::count_from_file(
-            file, ignore, no_hist,
-        )
-        .map_err(|source| AppError::HistoryRead {
-            parser: "fish",
-            path: file.to_string(),
+
+    let (parser, counts) = match history_format {
+        HistoryFormat::Fish => (
+            "fish",
+            fish::count_from_file(file, ignore, no_hist),
+        ),
+        HistoryFormat::Shell => (
+            "shell",
+            shell::count_from_file(file, ignore, no_hist),
+        ),
+        HistoryFormat::PowerShell => (
+            "powershell",
+            powershell::count_from_file(file, ignore, no_hist),
+        ),
+        HistoryFormat::Tcsh => (
+            "tcsh",
+            tcsh::count_from_file(file, ignore, no_hist),
+        ),
+    };
+
+    with_context(parser, file, counts)
+}
+
+fn with_context(
+    parser: &'static str,
+    path: &str,
+    counts: Result<AHashMap<String, usize>, io::Error>,
+) -> Result<FrequencyTable, HistoryLoadError> {
+    counts
+        .map(FrequencyTable::from_counts)
+        .map_err(|source| HistoryLoadError {
+            parser,
+            path: path.to_string(),
             source,
-        }),
-        HistoryFormat::Shell => history::count_from_file(file, ignore, no_hist)
-            .map_err(|source| AppError::HistoryRead {
-                parser: "shell",
-                path: file.to_string(),
-                source,
-            }),
-        HistoryFormat::PowerShell => history::powershell::count_from_file(
-            file, ignore, no_hist,
-        )
-        .map_err(|source| AppError::HistoryRead {
-            parser: "powershell",
-            path: file.to_string(),
-            source,
-        }),
-        HistoryFormat::Tcsh => history::tcsh::count_from_file(
-            file, ignore, no_hist,
-        )
-        .map_err(|source| AppError::HistoryRead {
-            parser: "tcsh",
-            path: file.to_string(),
-            source,
-        }),
-    }
+        })
 }
 
 #[cfg(test)]
@@ -87,7 +96,7 @@ mod tests {
     fn test_detect_history_format_fish_fixture() {
         let path = fixtures_path().join("fish_history");
         assert_eq!(
-            history::detect_history_format(path.to_str().unwrap()).unwrap(),
+            detect_history_format(path.to_str().unwrap()).unwrap(),
             HistoryFormat::Fish
         );
     }
@@ -96,7 +105,7 @@ mod tests {
     fn test_detect_history_format_shell_fixture() {
         let path = fixtures_path().join("bash_history");
         assert_eq!(
-            history::detect_history_format(path.to_str().unwrap()).unwrap(),
+            detect_history_format(path.to_str().unwrap()).unwrap(),
             HistoryFormat::Shell
         );
     }
@@ -105,7 +114,7 @@ mod tests {
     fn test_detect_history_format_tcsh_fixture() {
         let path = fixtures_path().join("tcsh_history");
         assert_eq!(
-            history::detect_history_format(path.to_str().unwrap()).unwrap(),
+            detect_history_format(path.to_str().unwrap()).unwrap(),
             HistoryFormat::Tcsh
         );
     }
@@ -120,7 +129,7 @@ mod tests {
         writeln!(file, "ls -la").unwrap();
 
         assert_eq!(
-            history::detect_history_format(path.to_str().unwrap()).unwrap(),
+            detect_history_format(path.to_str().unwrap()).unwrap(),
             HistoryFormat::PowerShell
         );
 
@@ -139,7 +148,7 @@ mod tests {
         writeln!(file, "ls -la").unwrap();
 
         assert_eq!(
-            history::detect_history_format(path_in_fish_dir.to_str().unwrap())
+            detect_history_format(path_in_fish_dir.to_str().unwrap())
                 .unwrap(),
             HistoryFormat::Shell
         );

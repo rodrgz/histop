@@ -2,11 +2,10 @@
 
 use std::{cmp, fmt, io};
 
-use crate::command::FrequencyTable;
+use crate::history::{self, HistoryLoadError};
 use crate::output::OutputFormat;
 use crate::output::color::ColorMode;
 
-mod parser;
 mod render;
 
 #[derive(Debug)]
@@ -39,6 +38,16 @@ impl fmt::Display for AppError {
     }
 }
 
+impl From<HistoryLoadError> for AppError {
+    fn from(error: HistoryLoadError) -> Self {
+        Self::HistoryRead {
+            parser: error.parser,
+            path: error.path,
+            source: error.source,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RunConfig {
     pub file: String,
@@ -56,13 +65,12 @@ pub struct RunConfig {
 }
 
 pub fn run(config: &RunConfig) -> Result<(), AppError> {
-    let command_counts = parser::load_command_counts(
+    let frequencies = history::load_command_frequencies(
         &config.file,
         &config.ignore,
         config.no_hist,
     )?;
-    let commands = FrequencyTable::from_counts(command_counts)
-        .into_ranked(config.more_than);
+    let commands = frequencies.into_ranked(config.more_than);
     let n = output_limit(commands.len(), config.all, config.count);
     render::write_output(&commands, n, config)
 }
