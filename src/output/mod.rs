@@ -93,6 +93,12 @@ mod tests {
         assert!(json.contains("\"command\": \"ls\""));
         assert!(json.contains("\"count\": 10"));
         assert!(json.contains("\"percentage\": 10.00"));
+
+        let single_entry = vec![CommandEntry::new("ls".to_string(), 1, 1)];
+        assert_eq!(
+            format_json(&single_entry),
+            "[\n  {\n    \"command\": \"ls\",\n    \"count\": 1,\n    \"percentage\": 100.00\n  }\n]"
+        );
     }
 
     #[test]
@@ -104,6 +110,12 @@ mod tests {
         let csv = format_csv(&entries);
         assert!(csv.starts_with("command,count,percentage\n"));
         assert!(csv.contains("ls,10,10.00"));
+
+        let single_entry = vec![CommandEntry::new("ls".to_string(), 1, 1)];
+        assert_eq!(
+            format_csv(&single_entry),
+            "command,count,percentage\nls,1,100.00\n"
+        );
     }
 
     #[test]
